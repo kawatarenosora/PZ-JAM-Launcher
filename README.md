@@ -64,7 +64,7 @@ Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). Sources
 ## Contributing
 
 - Translations: copy `lang/KEYS.md` table into `lang/<code>.json` (UTF-8) and open a PR
-- Bugs: open an Issue with the launcher log + `console.txt` lines (`GraphicsCard`, `[Alloy]`/`[BU-Agent]`)
+- Bugs: open an Issue with the launcher log + relevant `console.txt` lines (`GraphicsCard`, JavaMod loading parts, and other launcher-feature-related lines)
 
 ## License
 

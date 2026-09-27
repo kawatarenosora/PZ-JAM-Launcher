@@ -198,7 +198,6 @@ internal sealed class MainForm : Form
         var btnJm = new Button { Text = L.T("right.javamod", "Manage javamods..."), AutoSize = true };
         btnJm.Click += (_, _) => { using var f = new SyncForm(_config, Log); f.ShowDialog(this); };
         rowAct.Controls.Add(btnApply);
-        rowAct.Controls.Add(btnJm);
         rowAct.Controls.Add(btnLaunch);
         right.Controls.Add(rowAct);
         right.Controls.Add(new Label

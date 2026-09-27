@@ -49,12 +49,18 @@ internal sealed class AgentsForm : Form
         btnAdd.Click += (_, _) => AddRow();
         var btnDel = new Button { Text = L.T("agents.delete", "Delete"), AutoSize = true };
         btnDel.Click += (_, _) => DelRow();
+        var btnUp = new Button { Text = "▲", AutoSize = true };
+        btnUp.Click += (_, _) => MoveRow(-1);
+        var btnDown = new Button { Text = "▼", AutoSize = true };
+        btnDown.Click += (_, _) => MoveRow(1);
         _cmbGate = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 };
         _cmbGate.Items.AddRange(new object[] { "strict", "lenient", "none" });
         _cmbGate.SelectedIndexChanged += (_, _) => ChangeGate();
         _lblRev = new Label { Text = "rev: -", AutoSize = true };
         row.Controls.Add(btnAdd);
         row.Controls.Add(btnDel);
+        row.Controls.Add(btnUp);
+        row.Controls.Add(btnDown);
         row.Controls.Add(new Label { Text = L.T("agents.gate", "gate:"), AutoSize = true });
         row.Controls.Add(_cmbGate);
         row.Controls.Add(_lblRev);
@@ -106,6 +112,21 @@ internal sealed class AgentsForm : Form
         _log(L.T("log.agents.removed", "Agent removed: ") + _rows[_clb.SelectedIndex].JarPath);
         _rows.RemoveAt(_clb.SelectedIndex);
         RefreshList();
+    }
+
+    private void MoveRow(int dir)
+    {
+        var i = _clb.SelectedIndex;
+        if (i < 0 || i >= _rows.Count) return;
+        var j = i + dir;
+        if (j < 0 || j >= _rows.Count) return;
+        for (var k = 0; k < _rows.Count && k < _clb.Items.Count; k++)
+            _rows[k].Enabled = _clb.GetItemChecked(k);
+        var tmp = _rows[i];
+        _rows[i] = _rows[j];
+        _rows[j] = tmp;
+        RefreshList();
+        _clb.SelectedIndex = j;
     }
 
     private void ChangeGate()

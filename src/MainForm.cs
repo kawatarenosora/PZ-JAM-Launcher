@@ -37,7 +37,7 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = L.T("app.title", "PZ JAM Launcher (test)");
+        Text = L.T("app.title", "PZ JAM Launcher (v1.0)");
         Size = new Size(900, 600);
         StartPosition = FormStartPosition.CenterScreen;
         BuildUi();

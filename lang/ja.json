@@ -1,4 +1,4 @@
-{
+﻿{
   "agents.add": "追加...",
   "agents.choosetitle": "agent jar を選択",
   "agents.delete": "削除",
@@ -6,7 +6,7 @@
   "agents.gate": "gate:",
   "agents.saveclose": "保存して閉じる",
   "agents.title": "Agent管理",
-  "app.title": "PZ JAM Launcher (test)",
+  "app.title": "PZ JAM Launcher (v1.0)",
   "batch.confirm.ask": "{0}して良いですか?",
   "batch.confirm.list": "対象リスト",
   "batch.confirm.title": "確認",

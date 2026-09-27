@@ -1,4 +1,4 @@
-{
+﻿{
   "agents.add": "Adicionar...",
   "agents.choosetitle": "Selecionar agent jar",
   "agents.delete": "Excluir",
@@ -6,7 +6,7 @@
   "agents.gate": "gate:",
   "agents.saveclose": "Salvar e fechar",
   "agents.title": "Gerenciar Agents",
-  "app.title": "PZ JAM Launcher (test)",
+  "app.title": "PZ JAM Launcher (v1.0)",
   "batch.confirm.ask": "Confirmar {0}?",
   "batch.confirm.list": "Alvos:",
   "batch.confirm.title": "Confirmação",

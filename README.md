@@ -7,6 +7,8 @@
 
 **Windows launcher for Project Zomboid that simplifies JavaAgent mod installation and manages mod/JVM settings as profiles.**
 
+**⚠ No compatibility with macOS or Linux.**
+
 > 日本語版: [README.ja.md](README.ja.md)
 
 ## Screenshots

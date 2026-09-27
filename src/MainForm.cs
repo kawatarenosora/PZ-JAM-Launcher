@@ -143,12 +143,6 @@ internal sealed class MainForm : Form
         rowVk.Controls.Add(_btnVkOn);
         rowVk.Controls.Add(_btnVkOff);
         rowVk.Controls.Add(_lblVk);
-        rowVk.Controls.Add(new Label
-        {
-            Text = L.T("right.vk.note", "Only when installed manually. Not recommended on Mac."),
-            AutoSize = true,
-            ForeColor = Color.DarkRed,
-        });
         right.Controls.Add(rowVk);
 
         var rowFsr = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };

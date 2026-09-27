@@ -11,7 +11,7 @@
 
 ## Screenshots
 
-> TODO: add `docs/screenshot-main.png` (launcher window).
+![main window](docs/screenshot-main.png)
 
 ## Features
 

@@ -55,7 +55,7 @@ Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). Sources
 ## FAQ
 
 - **Workshop mods missing?** Start the Steam client first. Direct-java launches don't start Steam by themselves.
-- **Shows D3D12 instead of Zink?** `GALLIUM_DRIVER=zink` didn't reach the process, or Mesa isn't installed. VK mode needs manual Mesa install.
+- **Shows D3D12 instead of Zink?** Either Mesa isn't installed correctly, or you left VK ON in the launcher, quit it, then started the game from elsewhere (Steam / ProjectZomboid64.exe) without `GALLIUM_DRIVER=zink` reaching the process. Mesa without the variable falls back to D3D12. Fix: launch with VK ON from this launcher, or set the variable system-wide (see guide).
 - **Magpie won't scale?** Magpie needs manual install. Use windowed (not borderless/exclusive fullscreen) game + lower in-game resolution.
 - **Agent excluded (rev ...)?** Revision gate. Rebuild the agent for the current game rev.
 

@@ -828,15 +828,19 @@ internal sealed class MainForm : Form
                 foreach (var ag in enabled)
                 {
                     var cur = Javamod.Sha256(ag.JarPath);
-                    if (string.IsNullOrEmpty(ag.ApprovedSha) && string.IsNullOrEmpty(ag.PendingSha))
+                    if (!string.IsNullOrEmpty(ag.ApprovedSha) && cur == ag.ApprovedSha)
+                    {
+                        ag.PendingSha = string.Empty;
+                    }
+                    else if (!string.IsNullOrEmpty(ag.PendingSha) && cur == ag.PendingSha && cur != ag.ApprovedSha)
+                        pendingOk.Add(ag);
+                    else if (string.IsNullOrEmpty(ag.ApprovedSha) && string.IsNullOrEmpty(ag.PendingSha))
                         firstSeen.Add(ag);
                     else if (!string.IsNullOrEmpty(ag.ApprovedSha) && cur != ag.ApprovedSha)
                     {
                         ag.PendingSha = cur;
                         changed.Add((ag, cur));
                     }
-                    else if (!string.IsNullOrEmpty(ag.PendingSha) && cur == ag.PendingSha && cur != ag.ApprovedSha)
-                        pendingOk.Add(ag);
                 }
                 _config.Save();
                 if (firstSeen.Count > 0)

@@ -83,4 +83,6 @@ internal sealed class AgentEntry
     public string JarPath { get; set; } = string.Empty;
     public string Gate { get; set; } = "lenient";
     public string Sha256 { get; set; } = string.Empty;
+    public string ApprovedSha { get; set; } = string.Empty;
+    public string PendingSha { get; set; } = string.Empty;
 }

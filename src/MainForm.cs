@@ -37,7 +37,7 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = L.T("app.title", "PZ JAM Launcher (v1.0)");
+        Text = L.T("app.title", "PZ JAM Launcher (v1.1)");
         Size = new Size(900, 600);
         StartPosition = FormStartPosition.CenterScreen;
         BuildUi();
@@ -605,6 +605,28 @@ internal sealed class MainForm : Form
         catch { _lblAgents.Text = "-"; }
     }
 
+    private static string ResolveAgentAbs(string gameDir, string raw)
+    {
+        try
+        {
+            return Path.IsPathRooted(raw ?? string.Empty)
+                ? Path.GetFullPath(raw)
+                : Path.GetFullPath(Path.Combine(gameDir, raw ?? string.Empty));
+        }
+        catch { return raw ?? string.Empty; }
+    }
+
+    private static void MigrateAgentSha(AppConfig cfg)
+    {
+        try
+        {
+            foreach (var a in cfg.Agents)
+                if (string.IsNullOrEmpty(a.ApprovedSha) && !string.IsNullOrEmpty(a.Sha256))
+                    a.ApprovedSha = a.Sha256;
+        }
+        catch { }
+    }
+
     private static string NormalizeAgentPath(string p)
     {
         try
@@ -780,24 +802,101 @@ internal sealed class MainForm : Form
             }
             else
             {
+                MigrateAgentSha(_config);
                 var grev = Javamod.ReadGameRevision(gameDir);
-                foreach (var ag in _config.Agents.Where(a => a.Enabled))
+                var enabled = _config.Agents.Where(a => a.Enabled).ToList();
+                foreach (var ag in enabled)
+                    ag.JarPath = ResolveAgentAbs(gameDir, ag.JarPath);
+                var missing = enabled.Where(a => string.IsNullOrEmpty(a.JarPath) || !File.Exists(a.JarPath)).ToList();
+                if (missing.Count > 0)
                 {
-                    var raw = ag.JarPath ?? string.Empty;
-                    string abs;
-                    try
+                    MessageBox.Show(this,
+                        L.T("sha.missing.msg", "Not found. Removing from list:") + "\n" +
+                        string.Join("\n", missing.Select(a => Path.GetFileName(a.JarPath))),
+                        L.T("sha.missing.title", "Agent missing"),
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    foreach (var m in missing) _config.Agents.Remove(m);
+                    _config.Save();
+                    RefreshAgentSummary();
+                    log.Add(L.T("log.agent.missing.abort", "Launch aborted (missing agents removed)."));
+                    FlushLog(log);
+                    return;
+                }
+                var firstSeen = new List<AgentEntry>();
+                var changed = new List<(AgentEntry Ag, string Cur)>();
+                var pendingOk = new List<AgentEntry>();
+                foreach (var ag in enabled)
+                {
+                    var cur = Javamod.Sha256(ag.JarPath);
+                    if (string.IsNullOrEmpty(ag.ApprovedSha) && string.IsNullOrEmpty(ag.PendingSha))
+                        firstSeen.Add(ag);
+                    else if (!string.IsNullOrEmpty(ag.ApprovedSha) && cur != ag.ApprovedSha)
                     {
-                        abs = Path.IsPathRooted(raw)
-                            ? Path.GetFullPath(raw)
-                            : Path.GetFullPath(Path.Combine(gameDir, raw));
+                        ag.PendingSha = cur;
+                        changed.Add((ag, cur));
                     }
-                    catch { abs = raw; }
+                    else if (!string.IsNullOrEmpty(ag.PendingSha) && cur == ag.PendingSha && cur != ag.ApprovedSha)
+                        pendingOk.Add(ag);
+                }
+                _config.Save();
+                if (firstSeen.Count > 0)
+                {
+                    var r = MessageBox.Show(this,
+                        L.T("sha.firstseen.msg", "New agents. Approve?") + "\n" +
+                        string.Join("\n", firstSeen.Select(a => Path.GetFileName(a.JarPath))),
+                        L.T("sha.firstseen.title", "Approve new agents"),
+                        MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                    if (r != DialogResult.OK)
+                    {
+                        log.Add(L.T("log.sha.firstseen.cancel", "Launch aborted (new agents not approved)."));
+                        FlushLog(log);
+                        return;
+                    }
+                    foreach (var ag in firstSeen)
+                    {
+                        ag.ApprovedSha = Javamod.Sha256(ag.JarPath);
+                        ag.PendingSha = string.Empty;
+                    }
+                    _config.Save();
+                    log.Add(L.T("log.sha.firstseen.ok", "New agents approved."));
+                }
+                if (changed.Count > 0)
+                {
+                    MessageBox.Show(this,
+                        L.T("sha.changed.msg", "Updated:") + "\n" +
+                        string.Join("\n", changed.Select(c => Path.GetFileName(c.Ag.JarPath))),
+                        L.T("sha.changed.title", "Agents updated"),
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    _config.Save();
+                    log.Add(L.T("log.sha.changed.abort", "Launch aborted (agents updated). Approve on next launch."));
+                    FlushLog(log);
+                    return;
+                }
+                if (pendingOk.Count > 0)
+                {
+                    var r = MessageBox.Show(this,
+                        L.T("sha.pending.msg", "Approve recorded updates?") + "\n" +
+                        string.Join("\n", pendingOk.Select(a => Path.GetFileName(a.JarPath))),
+                        L.T("sha.pending.title", "Approve updates"),
+                        MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                    if (r != DialogResult.OK)
+                    {
+                        log.Add(L.T("log.sha.pending.cancel", "Launch aborted (updates not approved)."));
+                        FlushLog(log);
+                        return;
+                    }
+                    foreach (var ag in pendingOk)
+                    {
+                        ag.ApprovedSha = ag.PendingSha;
+                        ag.PendingSha = string.Empty;
+                    }
+                    _config.Save();
+                    log.Add(L.T("log.sha.pending.ok", "Updates approved."));
+                }
+                foreach (var ag in enabled)
+                {
+                    var abs = ag.JarPath;
                     var tag = Path.GetFileName(abs);
-                    if (string.IsNullOrEmpty(raw) || !File.Exists(abs))
-                    {
-                        log.Add(string.Format(L.T("log.agent.missing", "Agent excluded (missing): {0}."), tag));
-                        continue;
-                    }
                     var gate = (ag.Gate ?? "lenient").ToLowerInvariant();
                     var sha = Javamod.Sha256(abs);
                     var arev = Javamod.ReadAgentRevision(abs);

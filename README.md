@@ -18,7 +18,7 @@
 ## Features
 
 - **JavaAgent mods**: multi-agent `-javaagent` composition with per-agent gates (`strict` / `lenient` / `none`), revision checks, SHA-256 logging
-- **javamod sync**: staging folder → template mod sync, Workshop update check (SHA-256), delete flow with confirmations
+- **javamod check/approval flow**: per-agent SHA-256 verification at launch. First-seen jars need approval, changed jars abort the launch with a report dialog and need approval on next launch, missing jars abort and are removed from the list
 - **Profiles**: save/select launch configs (agents, JVM, args). Launch button locks until a profile is selected
 - **JVM**: numeric `-Xms`/`-Xmx`, custom JVM window, safe mode
 - **Safety**: force-kill with freeze-only warning, duplicate-launch guard
@@ -29,12 +29,16 @@
 - **VK mode (Mesa Zink)**: OpenGL-over-Vulkan rendering. Works only if you installed Mesa yourself
 - **FSR scaling (Magpie)**: start/kill Magpie from the launcher. Works only if you installed Magpie yourself
 
+Setup: [EXTERNAL-TOOLS.md](EXTERNAL-TOOLS.md).
+
 ## Quick Start
 
 1. Download `PZJAMLauncher.exe` and `lang/` from [Releases](releases) (no install, no runtime needed)
 2. Run `PZJAMLauncher.exe` → game folder is auto-detected → create a profile → **Launch**
 
 > Steam must be running for Workshop mods. The launcher never modifies your saves or mod enable-lists.
+
+Details: [Tutorial](TUTORIAL.md).
 
 ## Requirements
 

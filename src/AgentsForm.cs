@@ -7,14 +7,26 @@ using System.Windows.Forms;
 
 namespace PZLauncher;
 
+internal sealed class NoDblClickCheckedListBox : CheckedListBox
+{
+    private const int WM_LBUTTONDBLCLK = 0x203;
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_LBUTTONDBLCLK) return;
+        base.WndProc(ref m);
+    }
+}
+
 internal sealed class AgentsForm : Form
 {
     private readonly AppConfig _config;
     private readonly Action<string> _log;
-    private CheckedListBox _clb;
+    private NoDblClickCheckedListBox _clb;
     private ComboBox _cmbGate;
     private Label _lblRev;
     private List<AgentEntry> _rows = new();
+    private int _selBeforeDown = -1;
 
     public AgentsForm(AppConfig config, Action<string> log)
     {
@@ -34,11 +46,24 @@ internal sealed class AgentsForm : Form
 
     private void BuildUi()
     {
-        _clb = new CheckedListBox
+        _clb = new NoDblClickCheckedListBox
         {
-            Dock = DockStyle.Top, Height = 260, CheckOnClick = true,
+            Dock = DockStyle.Top, Height = 260, CheckOnClick = false,
         };
         _clb.SelectedIndexChanged += (_, _) => ShowSelected();
+        _clb.MouseDown += (s, e) => { _selBeforeDown = _clb.SelectedIndex; };
+        _clb.MouseClick += (s, e) =>
+        {
+            var idx = _clb.IndexFromPoint(e.Location);
+            if (idx < 0 || idx >= _rows.Count) return;
+            if (idx != _selBeforeDown || idx != _clb.SelectedIndex) return;
+            using var g = _clb.CreateGraphics();
+            var gw = System.Windows.Forms.CheckBoxRenderer.GetGlyphSize(
+                g, System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal).Width + 6;
+            var r = _clb.GetItemRectangle(idx);
+            if (e.X - r.Left <= gw)
+                _clb.SetItemChecked(idx, !_clb.GetItemChecked(idx));
+        };
         Controls.Add(_clb);
 
         var row = new FlowLayoutPanel
@@ -73,13 +98,16 @@ internal sealed class AgentsForm : Form
 
     private void RefreshList()
     {
+        var top = 0;
+        try { top = _clb.TopIndex; } catch { }
         _clb.Items.Clear();
         foreach (var a in _rows)
         {
             var rev = Javamod.ReadAgentRevision(a.JarPath);
-            var idx = _clb.Items.Add($"{(a.Enabled ? "[x]" : "[ ]")} {Path.GetFileName(a.JarPath)} [{a.Gate}] rev:{(string.IsNullOrEmpty(rev) ? "?" : rev)}");
+            var idx = _clb.Items.Add($"{Path.GetFileName(a.JarPath)} [{a.Gate}] rev:{(string.IsNullOrEmpty(rev) ? "?" : rev)}");
             _clb.SetItemChecked(idx, a.Enabled);
         }
+        try { _clb.TopIndex = Math.Min(top, Math.Max(0, _clb.Items.Count - 1)); } catch { }
         ShowSelected();
     }
 
@@ -133,8 +161,6 @@ internal sealed class AgentsForm : Form
     {
         if (_clb.SelectedIndex < 0 || _clb.SelectedIndex >= _rows.Count) return;
         if (_cmbGate.SelectedItem == null) return;
-        for (var i = 0; i < _rows.Count && i < _clb.Items.Count; i++)
-            _rows[i].Enabled = _clb.GetItemChecked(i);
         _rows[_clb.SelectedIndex].Gate = _cmbGate.SelectedItem.ToString() ?? "lenient";
         RefreshList();
         _clb.SelectedIndex = Math.Min(_clb.SelectedIndex, _rows.Count - 1);

@@ -88,6 +88,14 @@ internal sealed class MainForm : Form
         _cmbLang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
         _cmbLang.SelectedIndexChanged += (_, _) => ChangeLang();
         left.Controls.Add(_cmbLang);
+        left.Controls.Add(new Label
+        {
+            Text = L.T("left.restart.note", "Applies after restart."),
+            AutoSize = true,
+            MaximumSize = new Size(230, 0),
+            ForeColor = Color.DarkRed,
+            Font = new Font(DefaultFont.FontFamily, 10, FontStyle.Bold),
+        });
 
         left.Controls.Add(new Label { Text = L.T("left.gamepath", "Game folder"), AutoSize = true });
         _txtGamePath = new TextBox { Width = 230 };
@@ -117,9 +125,12 @@ internal sealed class MainForm : Form
         var rowProf = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         var btnProfNew = new Button { Text = L.T("left.new", "New"), AutoSize = true };
         btnProfNew.Click += (_, _) => NewProfile();
+        var btnProfRen = new Button { Text = L.T("left.rename", "Rename"), AutoSize = true };
+        btnProfRen.Click += (_, _) => RenameProfile();
         var btnProfDel = new Button { Text = L.T("left.delete", "Delete"), AutoSize = true };
         btnProfDel.Click += (_, _) => DeleteProfile();
         rowProf.Controls.Add(btnProfNew);
+        rowProf.Controls.Add(btnProfRen);
         rowProf.Controls.Add(btnProfDel);
         left.Controls.Add(rowProf);
 
@@ -501,6 +512,11 @@ internal sealed class MainForm : Form
     {
         var name = Interaction.InputBox(L.T("dlg.profilename", "Profile name"), "PZ JAM Launcher", "Default");
         if (string.IsNullOrWhiteSpace(name)) return;
+        if (_config.Profiles.ContainsKey(name))
+        {
+            Log(L.T("log.profile.exists", "Profile already exists: ") + name);
+            return;
+        }
         _config.Profiles[name] = new LaunchProfile
         {
             Vk = GetVkState() == 1,
@@ -529,6 +545,27 @@ internal sealed class MainForm : Form
         _config.Save();
         RefreshProfiles();
         RefreshLaunchButton();
+    }
+
+    private void RenameProfile()
+    {
+        if (_lstProfiles.SelectedItem == null) return;
+        var old = _lstProfiles.SelectedItem.ToString() ?? string.Empty;
+        if (!_config.Profiles.TryGetValue(old, out var p)) return;
+        var name = Interaction.InputBox(L.T("dlg.profilerename", "New profile name"), "PZ JAM Launcher", old);
+        if (string.IsNullOrWhiteSpace(name) || name == old) return;
+        if (_config.Profiles.ContainsKey(name))
+        {
+            Log(L.T("log.profile.exists", "Profile already exists: ") + name);
+            return;
+        }
+        _config.Profiles.Remove(old);
+        _config.Profiles[name] = p;
+        _currentProfile = name;
+        _config.Save();
+        RefreshProfiles();
+        _lstProfiles.SelectedItem = name;
+        Log(L.T("log.profile.renamed", "Profile renamed: ") + $"{old} -> {name}");
     }
 
     private void ApplyProfile()

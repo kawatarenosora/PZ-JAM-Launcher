@@ -194,7 +194,9 @@ internal sealed class AgentsForm : Form
     {
         for (var i = 0; i < _rows.Count && i < _clb.Items.Count; i++)
             _rows[i].Enabled = _clb.GetItemChecked(i);
-        foreach (var a in _rows) a.Sha256 = Javamod.Sha256(a.JarPath);
+        foreach (var a in _rows)
+            if (!string.IsNullOrEmpty(a.ApprovedSha) || !string.IsNullOrEmpty(a.PendingSha) || !string.IsNullOrEmpty(a.Sha256))
+                a.Sha256 = Javamod.Sha256(a.JarPath);
         _config.Agents = _rows;
     }
 }

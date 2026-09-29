@@ -498,6 +498,7 @@ internal sealed class MainForm : Form
         _config.Agents = p.Agents.Select(a => new AgentEntry
         {
             Enabled = a.Enabled, JarPath = a.JarPath, Gate = a.Gate, Sha256 = a.Sha256,
+            ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
         }).ToList();
         RefreshAgentSummary();
         _txtExtra.Text = p.Extra;
@@ -528,7 +529,7 @@ internal sealed class MainForm : Form
             Agents = _config.Agents.Select(a => new AgentEntry
             {
                 Enabled = a.Enabled, JarPath = a.JarPath, Gate = a.Gate,
-                Sha256 = Javamod.Sha256(a.JarPath),
+                Sha256 = a.Sha256, ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
             }).ToList(),
         };
         _config.Save();
@@ -586,7 +587,7 @@ internal sealed class MainForm : Form
             Agents = _config.Agents.Select(a => new AgentEntry
             {
                 Enabled = a.Enabled, JarPath = a.JarPath, Gate = a.Gate,
-                Sha256 = Javamod.Sha256(a.JarPath),
+                Sha256 = a.Sha256, ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
             }).ToList(),
         };
         _config.Save();

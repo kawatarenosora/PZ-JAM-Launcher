@@ -26,7 +26,7 @@ internal sealed class AgentsForm : Form
     private ComboBox _cmbGate;
     private Label _lblRev;
     private List<AgentEntry> _rows = new();
-    private int _selBeforeDown = -1;
+    private bool _allowCheck;
 
     public AgentsForm(AppConfig config, Action<string> log)
     {
@@ -51,18 +51,21 @@ internal sealed class AgentsForm : Form
             Dock = DockStyle.Top, Height = 260, CheckOnClick = false,
         };
         _clb.SelectedIndexChanged += (_, _) => ShowSelected();
-        _clb.MouseDown += (s, e) => { _selBeforeDown = _clb.SelectedIndex; };
+        _clb.ItemCheck += (s, e) => { if (!_allowCheck) e.NewValue = e.CurrentValue; };
         _clb.MouseClick += (s, e) =>
         {
             var idx = _clb.IndexFromPoint(e.Location);
             if (idx < 0 || idx >= _rows.Count) return;
-            if (idx != _selBeforeDown || idx != _clb.SelectedIndex) return;
+            if (idx != _clb.SelectedIndex) return;
             using var g = _clb.CreateGraphics();
             var gw = System.Windows.Forms.CheckBoxRenderer.GetGlyphSize(
                 g, System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal).Width + 6;
             var r = _clb.GetItemRectangle(idx);
-            if (e.X - r.Left <= gw)
-                _clb.SetItemChecked(idx, !_clb.GetItemChecked(idx));
+            if (e.X - r.Left > gw) return;
+            _allowCheck = true;
+            try { _clb.SetItemChecked(idx, !_clb.GetItemChecked(idx)); }
+            finally { _allowCheck = false; }
+            _rows[idx].Enabled = _clb.GetItemChecked(idx);
         };
         Controls.Add(_clb);
 
@@ -78,6 +81,8 @@ internal sealed class AgentsForm : Form
         btnUp.Click += (_, _) => MoveRow(-1);
         var btnDown = new Button { Text = "▼", AutoSize = true };
         btnDown.Click += (_, _) => MoveRow(1);
+        var btnToggle = new Button { Text = L.T("agents.toggle", "Toggle"), AutoSize = true };
+        btnToggle.Click += (_, _) => ToggleRow();
         _cmbGate = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 };
         _cmbGate.Items.AddRange(new object[] { "strict", "lenient", "none" });
         _cmbGate.SelectedIndexChanged += (_, _) => ChangeGate();
@@ -86,6 +91,7 @@ internal sealed class AgentsForm : Form
         row.Controls.Add(btnDel);
         row.Controls.Add(btnUp);
         row.Controls.Add(btnDown);
+        row.Controls.Add(btnToggle);
         row.Controls.Add(new Label { Text = L.T("agents.gate", "gate:"), AutoSize = true });
         row.Controls.Add(_cmbGate);
         row.Controls.Add(_lblRev);
@@ -100,13 +106,18 @@ internal sealed class AgentsForm : Form
     {
         var top = 0;
         try { top = _clb.TopIndex; } catch { }
-        _clb.Items.Clear();
-        foreach (var a in _rows)
+        _allowCheck = true;
+        try
         {
-            var rev = Javamod.ReadAgentRevision(a.JarPath);
-            var idx = _clb.Items.Add($"{Path.GetFileName(a.JarPath)} [{a.Gate}] rev:{(string.IsNullOrEmpty(rev) ? "?" : rev)}");
-            _clb.SetItemChecked(idx, a.Enabled);
+            _clb.Items.Clear();
+            foreach (var a in _rows)
+            {
+                var rev = Javamod.ReadAgentRevision(a.JarPath);
+                var idx = _clb.Items.Add($"{Path.GetFileName(a.JarPath)} [{a.Gate}] rev:{(string.IsNullOrEmpty(rev) ? "?" : rev)}");
+                _clb.SetItemChecked(idx, a.Enabled);
+            }
         }
+        finally { _allowCheck = false; }
         try { _clb.TopIndex = Math.Min(top, Math.Max(0, _clb.Items.Count - 1)); } catch { }
         ShowSelected();
     }
@@ -142,6 +153,17 @@ internal sealed class AgentsForm : Form
         RefreshList();
     }
 
+    private void ToggleRow()
+    {
+        if (_clb.SelectedIndex < 0 || _clb.SelectedIndex >= _rows.Count) return;
+        var i = _clb.SelectedIndex;
+        var v = !_clb.GetItemChecked(i);
+        _allowCheck = true;
+        try { _clb.SetItemChecked(i, v); }
+        finally { _allowCheck = false; }
+        _rows[i].Enabled = v;
+    }
+
     private void MoveRow(int dir)
     {
         var i = _clb.SelectedIndex;
@@ -161,6 +183,8 @@ internal sealed class AgentsForm : Form
     {
         if (_clb.SelectedIndex < 0 || _clb.SelectedIndex >= _rows.Count) return;
         if (_cmbGate.SelectedItem == null) return;
+        for (var i = 0; i < _rows.Count && i < _clb.Items.Count; i++)
+            _rows[i].Enabled = _clb.GetItemChecked(i);
         _rows[_clb.SelectedIndex].Gate = _cmbGate.SelectedItem.ToString() ?? "lenient";
         RefreshList();
         _clb.SelectedIndex = Math.Min(_clb.SelectedIndex, _rows.Count - 1);

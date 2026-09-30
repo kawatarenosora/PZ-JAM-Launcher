@@ -9,8 +9,6 @@
 
 **⚠ No compatibility with macOS or Linux.**
 
-> 日本語版: [README.ja.md](README.ja.md)
-
 ## Screenshots
 
 ![main window](docs/screenshot-main.png)

@@ -1,0 +1,12 @@
+# Build output. The executable is produced by "dotnet publish" and is not
+# part of the source; shipping it in the repository would put a 160 MB binary
+# in every clone for no benefit.
+src/bin/
+src/obj/
+src/out/
+
+# PZLauncher.settings.json is per machine: it holds absolute paths, and it is
+# rewritten by the launcher itself on every start, so a committed copy would
+# fight the user's copy rather than help them.
+PZLauncher.settings.json
+PZLauncher.settings.json.bak*

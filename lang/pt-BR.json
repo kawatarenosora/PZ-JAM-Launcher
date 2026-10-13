@@ -1,9 +1,10 @@
-﻿{
+{
   "agents.add": "Adicionar...",
   "agents.choosetitle": "Selecionar agent jar",
   "agents.delete": "Excluir",
   "agents.filter": "agent jar|*.jar",
   "agents.gate": "gate:",
+"agents.args": "argumentos:",
   "agents.saveclose": "Salvar e fechar",
   "agents.title": "Gerenciar Agents",
   "app.title": "PZ JAM Launcher (v1.1)",

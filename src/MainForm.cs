@@ -498,7 +498,7 @@ internal sealed class MainForm : Form
         _config.Agents = p.Agents.Select(a => new AgentEntry
         {
             Enabled = a.Enabled, JarPath = a.JarPath, Gate = a.Gate, Sha256 = a.Sha256,
-            ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
+            ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha, Args = a.Args ?? string.Empty,
         }).ToList();
         RefreshAgentSummary();
         _txtExtra.Text = p.Extra;
@@ -529,7 +529,7 @@ internal sealed class MainForm : Form
             Agents = _config.Agents.Select(a => new AgentEntry
             {
                 Enabled = a.Enabled, JarPath = a.JarPath, Gate = a.Gate,
-                Sha256 = a.Sha256, ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
+            ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha, Args = a.Args ?? string.Empty,
             }).ToList(),
         };
         _config.Save();
@@ -587,7 +587,7 @@ internal sealed class MainForm : Form
             Agents = _config.Agents.Select(a => new AgentEntry
             {
                 Enabled = a.Enabled, JarPath = a.JarPath, Gate = a.Gate,
-                Sha256 = a.Sha256, ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
+            ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha, Args = a.Args ?? string.Empty,
             }).ToList(),
         };
         _config.Save();
@@ -635,6 +635,11 @@ internal sealed class MainForm : Form
             var t = p.Trim().Trim('"');
             if (t.StartsWith("-javaagent:", StringComparison.OrdinalIgnoreCase))
                 t = t.Substring("-javaagent:".Length);
+            // ★-javaagent:jar=引数 の「=引数」を落とす。落とさないと
+            //   Path.GetFullPath が "jar=-Dfoo=bar" をファイル名として扱い、
+            //   重複判定が必ず外れて同じ agent が二重に起動される。
+            var eq = t.IndexOf('=');
+            if (eq >= 0) t = t.Substring(0, eq);
             t = t.Trim().Trim('"');
             return Path.GetFullPath(t).TrimEnd(Path.DirectorySeparatorChar).ToLowerInvariant();
         }
@@ -922,7 +927,11 @@ internal sealed class MainForm : Form
                         t.StartsWith("-javaagent", StringComparison.OrdinalIgnoreCase) &&
                         NormalizeAgentPath(t) == norm);
                     if (dup) { log.Add(string.Format(L.T("log.agent.dup", "Agent suppressed (already in manual args): {0}."), tag)); continue; }
-                    psi.ArgumentList.Add("-javaagent:" + abs);
+                    // ★「=引数」形式は、agent 自身が args 文字列も読む時に効く。
+                    //   「=」の後ろは JVM 引数ではなく <args> なので、
+                    //   agent 側の System.getProperty には届かない。空なら付けない。
+                    var agentArgs = string.IsNullOrWhiteSpace(ag.Args) ? string.Empty : "=" + ag.Args.Trim();
+                    psi.ArgumentList.Add("-javaagent:" + abs + agentArgs);
                     log.Add(string.Format(L.T("log.agent.applied", "Agent applied [{0}] jar={1} sha={2} rev={3}."),
                         gate, tag, sha.Length >= 8 ? sha.Substring(0, 8) : "?", string.IsNullOrEmpty(arev) ? "?" : arev));
                 }

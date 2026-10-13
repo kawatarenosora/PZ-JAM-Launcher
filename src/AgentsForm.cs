@@ -24,21 +24,25 @@ internal sealed class AgentsForm : Form
     private readonly Action<string> _log;
     private NoDblClickCheckedListBox _clb;
     private ComboBox _cmbGate;
+    private TextBox _txtArgs;
     private Label _lblRev;
     private List<AgentEntry> _rows = new();
     private bool _allowCheck;
+    /// ★<see cref="ShowSelected"/> がテキストボックスを埋める途中の TextChanged を無視する。
+    private bool _showSelected;
 
     public AgentsForm(AppConfig config, Action<string> log)
     {
         _config = config;
         _log = log;
         Text = L.T("agents.title", "Manage Agents");
-        Size = new Size(620, 440);
+        Size = new Size(620, 500);
         StartPosition = FormStartPosition.CenterParent;
         _rows = config.Agents.Select(a => new AgentEntry
         {
             Enabled = a.Enabled, JarPath = a.JarPath, Gate = string.IsNullOrEmpty(a.Gate) ? "lenient" : a.Gate,
             Sha256 = a.Sha256,
+            Args = a.Args ?? string.Empty,
         }).ToList();
         BuildUi();
         RefreshList();
@@ -97,9 +101,31 @@ internal sealed class AgentsForm : Form
         row.Controls.Add(_lblRev);
         Controls.Add(row);
 
+        // ★agent ごとの引数。JVM は -javaagent:jar=引数 の形式を取るが、
+        //   ここが無くると -Dxxx=yyy を渡す手段が無い。safe mode を切って
+        //   ManualText に書く方法もあるが、あとから壊れやすい。
+        var argsRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top, Height = 36, FlowDirection = FlowDirection.LeftToRight,
+        };
+        var lblArgs = new Label { Text = L.T("agents.args", "args:"), AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
+        _txtArgs = new TextBox { Width = 430 };
+        _txtArgs.TextChanged += (_, _) => StoreArgs();
+        argsRow.Controls.Add(lblArgs);
+        argsRow.Controls.Add(_txtArgs);
+        Controls.Add(argsRow);
+
         var btnSave = new Button { Text = L.T("agents.saveclose", "Save and close"), Dock = DockStyle.Bottom, Height = 34 };
         btnSave.Click += (_, _) => { ApplyChecks(); _config.Save(); Close(); };
         Controls.Add(btnSave);
+    }
+
+    /// ★編集中のテキストボックスの内容を、現在の行へ書き戻す。
+    private void StoreArgs()
+    {
+        if (_showSelected) return;
+        if (_clb.SelectedIndex < 0 || _clb.SelectedIndex >= _rows.Count) return;
+        _rows[_clb.SelectedIndex].Args = _txtArgs.Text ?? string.Empty;
     }
 
     private void RefreshList()
@@ -113,7 +139,9 @@ internal sealed class AgentsForm : Form
             foreach (var a in _rows)
             {
                 var rev = Javamod.ReadAgentRevision(a.JarPath);
-                var idx = _clb.Items.Add($"{Path.GetFileName(a.JarPath)} [{a.Gate}] rev:{(string.IsNullOrEmpty(rev) ? "?" : rev)}");
+                // ★引数が付いている行には印を付ける。一覧を見ればどれか分かる。
+                var mark = string.IsNullOrWhiteSpace(a.Args) ? "" : " +args";
+                var idx = _clb.Items.Add($"{Path.GetFileName(a.JarPath)} [{a.Gate}]{mark} rev:{(string.IsNullOrEmpty(rev) ? "?" : rev)}");
                 _clb.SetItemChecked(idx, a.Enabled);
             }
         }
@@ -127,6 +155,7 @@ internal sealed class AgentsForm : Form
         if (_clb.SelectedIndex < 0 || _clb.SelectedIndex >= _rows.Count)
         {
             _lblRev.Text = "rev: -";
+            _txtArgs.Text = string.Empty;
             return;
         }
         var a = _rows[_clb.SelectedIndex];
@@ -134,6 +163,10 @@ internal sealed class AgentsForm : Form
         var sha = Javamod.Sha256(a.JarPath);
         _lblRev.Text = $"rev: {(string.IsNullOrEmpty(rev) ? "?" : rev)} sha:{(sha.Length >= 8 ? sha.Substring(0, 8) : "?")}";
         _cmbGate.SelectedItem = new[] { "strict", "lenient", "none" }.Contains(a.Gate) ? a.Gate : "lenient";
+        // ★選択を変えた直後に TextChanged が起きるので、更新中は黙らせる。
+        _showSelected = true;
+        try { _txtArgs.Text = a.Args ?? string.Empty; }
+        finally { _showSelected = false; }
     }
 
     private void AddRow()

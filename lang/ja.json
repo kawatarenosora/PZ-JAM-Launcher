@@ -1,9 +1,10 @@
-﻿{
+{
   "agents.add": "追加...",
   "agents.choosetitle": "agent jar を選択",
   "agents.delete": "削除",
   "agents.filter": "agent jar|*.jar",
   "agents.gate": "gate:",
+"agents.args": "引数:",
   "agents.saveclose": "保存して閉じる",
   "agents.title": "Agent管理",
   "app.title": "PZ JAM Launcher (v1.1)",

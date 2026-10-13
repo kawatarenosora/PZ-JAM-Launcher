@@ -85,4 +85,17 @@ internal sealed class AgentEntry
     public string Sha256 { get; set; } = string.Empty;
     public string ApprovedSha { get; set; } = string.Empty;
     public string PendingSha { get; set; } = string.Empty;
+
+    /// <summary>
+    /// agent に渡す引数。<b>リポジトリの既知の罠に直結する。</b>
+    ///
+    /// <p>JVM は <c>-javaagent:jar=引数</c> の形式を取る。<c>=</c> の後ろは
+    /// <c>&lt;args&gt;</c> であって JVM 引数ではないので、agent 側の
+    /// <c>System.getProperty</c> には届かない。agent 側が args 文字列も
+    /// なっているのはそのためで、ここに書かなければ agent の
+    /// <c>-Dxxx=yyy</c> が全部 no-op になる。
+    ///
+    /// <p>空文字なら従来通り <c>-javaagent:jar</c> だけで起動する。
+    /// </summary>
+    public string Args { get; set; } = string.Empty;
 }

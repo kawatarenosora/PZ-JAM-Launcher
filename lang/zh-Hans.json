@@ -1,9 +1,10 @@
-﻿{
+{
   "agents.add": "添加...",
   "agents.choosetitle": "选择 agent jar",
   "agents.delete": "删除",
   "agents.filter": "agent jar|*.jar",
   "agents.gate": "gate:",
+"agents.args": "参数:",
   "agents.saveclose": "保存并关闭",
   "agents.title": "管理 Agents",
   "app.title": "PZ JAM Launcher (v1.1)",

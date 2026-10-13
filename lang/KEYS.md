@@ -83,6 +83,7 @@
 | `agents.add` | Add... |
 | `agents.delete` | Delete |
 | `agents.gate` | gate: |
+| `agents.args` | args: |
 | `agents.saveclose` | Save and close |
 | `agents.filter` | agent jar|*.jar |
 | `agents.choosetitle` | Select agent jar |

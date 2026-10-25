@@ -5,6 +5,10 @@ src/bin/
 src/obj/
 src/out/
 
+# The built deliverable stays next to the repo root for zipping, but is not
+# tracked here (GitHub rejects files larger than 100 MB).
+/PZJAMLauncher.exe
+
 # PZLauncher.settings.json is per machine: it holds absolute paths, and it is
 # rewritten by the launcher itself on every start, so a committed copy would
 # fight the user's copy rather than help them.

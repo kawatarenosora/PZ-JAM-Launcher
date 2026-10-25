@@ -25,8 +25,8 @@ internal sealed class MainForm : Form
     private System.Windows.Forms.Timer _watch;
     private CheckBox _chkSafe;
     private Label _lblAgents;
-    private Button _btnVkOn;
-    private Button _btnVkOff;
+    private ComboBox _cmbRender;
+    private bool _suspendRender;
     private Label _lblVk;
     private NumericUpDown _txtXms;
     private NumericUpDown _txtXmx;
@@ -37,7 +37,11 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = L.T("app.title", "PZ JAM Launcher (v1.1)");
+        // ★版数はアセンブリ情報から自動で付ける。lang 側の app.title には版数を
+        //   書かない (更新のたびに古い版数が残る事故をなくすため)。
+        var baseName = L.T("app.title", "PZ JAM Launcher");
+        var ver = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+        Text = $"{baseName} v{(ver == null ? "?" : ver.ToString(3))}";
         Size = new Size(900, 600);
         StartPosition = FormStartPosition.CenterScreen;
         BuildUi();
@@ -145,14 +149,20 @@ internal sealed class MainForm : Form
         _split.Panel2.Controls.Add(right);
 
         var rowVk = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
-        _btnVkOn = new Button { Text = L.T("vk.on", "VK ON"), AutoSize = true };
-        _btnVkOn.Click += (_, _) => VkOn();
-        _btnVkOff = new Button { Text = L.T("vk.off", "VK OFF"), AutoSize = true };
-        _btnVkOff.Click += (_, _) => VkOff();
+        // ★3値切替: オフ (ネイティブGL) / VK (Zink→Vulkan) / D3D12 (GL over D3D12)。
+        _cmbRender = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        _cmbRender.Items.AddRange(new object[]
+        {
+            L.T("render.off", "Off"), L.T("render.zink", "VK (Zink)"), L.T("render.d3d12", "D3D12"),
+        });
+        _cmbRender.SelectedIndexChanged += (_, _) =>
+        {
+            if (_suspendRender) return;
+            SetRender(_cmbRender.SelectedIndex);
+        };
         _lblVk = new Label { Text = "?", AutoSize = true };
-        rowVk.Controls.Add(new Label { Text = L.T("right.vk", "VK (Zink)"), AutoSize = true, TextAlign = ContentAlignment.MiddleLeft });
-        rowVk.Controls.Add(_btnVkOn);
-        rowVk.Controls.Add(_btnVkOff);
+        rowVk.Controls.Add(new Label { Text = L.T("right.render", "Renderer"), AutoSize = true, TextAlign = ContentAlignment.MiddleLeft });
+        rowVk.Controls.Add(_cmbRender);
         rowVk.Controls.Add(_lblVk);
         right.Controls.Add(rowVk);
 
@@ -279,15 +289,29 @@ internal sealed class MainForm : Form
 
     private void RefreshVkState()
     {
-        if (_lblVk == null) return;
-        switch (GetVkState())
+        // ★実効モードに合わせてコンボと表示を同期。選択済み値が同じなら
+        //   SelectedIndex を触らない (イベント自噴火の防止)。
+        var mode = ResolvedRender();
+        if (_cmbRender != null)
         {
-            case 1:
-                _lblVk.Text = L.T("vk.state.on", "enabled");
+            var idx = mode == "off" ? 0 : mode == "d3d12" ? 2 : 1;
+            _suspendRender = true;
+            try { if (_cmbRender.SelectedIndex != idx) _cmbRender.SelectedIndex = idx; }
+            finally { _suspendRender = false; }
+        }
+        if (_lblVk == null) return;
+        switch (mode)
+        {
+            case "zink":
+                _lblVk.Text = L.T("render.zink", "VK (Zink)");
                 _lblVk.ForeColor = Color.Green;
                 break;
-            case 0:
-                _lblVk.Text = L.T("vk.state.off", "disabled");
+            case "d3d12":
+                _lblVk.Text = L.T("render.d3d12", "D3D12");
+                _lblVk.ForeColor = Color.Green;
+                break;
+            case "off":
+                _lblVk.Text = L.T("render.off", "Off");
                 _lblVk.ForeColor = Color.Red;
                 break;
             default:
@@ -329,10 +353,44 @@ internal sealed class MainForm : Form
         RefreshVkState();
     }
 
-    private void ApplyVkState(bool want)
+    /// <summary>
+    /// ★実効モード。ディスク (Mesa の有無) が正。在席時だけ設定値の
+    ///   d3d12 / zink を採用し、それ以外はオフ・不明になる。
+    /// 返す値はそのまま GALLIUM_DRIVER の値として効く ("zink" | "d3d12")。
+    /// </summary>
+    private string ResolvedRender()
     {
-        if (want) VkOn();
-        else VkOff();
+        switch (GetVkState())
+        {
+            case 1: return _config.Render == "d3d12" ? "d3d12" : "zink";
+            case 0: return "off";
+            default: return "unknown";
+        }
+    }
+
+    private void SetRender(int idx) => SetRender(idx == 2 ? "d3d12" : idx == 1 ? "zink" : "off");
+
+    /// <summary>★モード切替。Mesa の復帰/退避 + 設定保存をひとまとめにする。</summary>
+    private void SetRender(string mode)
+    {
+        switch (mode)
+        {
+            case "zink":
+                VkOn();
+                break;
+            case "d3d12":
+                // ★VkOn の復帰ログに続き、ドライバだけを明示する。
+                VkOn();
+                Log(L.T("log.mesa.d3d12", "D3D12: Mesa restored (GL over D3D12)."));
+                break;
+            default:
+                mode = "off";
+                VkOff();
+                break;
+        }
+        _config.Render = mode;
+        SaveSettings();
+        RefreshVkState();
     }
 
     private Process FindPzProcess()
@@ -376,8 +434,7 @@ internal sealed class MainForm : Form
     {
         bool running = false;
         try { running = IsGameRunning(); } catch { }
-        if (_btnVkOn != null) _btnVkOn.Enabled = !running;
-        if (_btnVkOff != null) _btnVkOff.Enabled = !running;
+        if (_cmbRender != null) _cmbRender.Enabled = !running;
         if (_btnLaunch == null) return;
         if (string.IsNullOrEmpty(_currentProfile) || !_config.Profiles.ContainsKey(_currentProfile))
         {
@@ -493,7 +550,8 @@ internal sealed class MainForm : Form
         if (_lstProfiles.SelectedItem == null) return;
         _currentProfile = _lstProfiles.SelectedItem.ToString() ?? string.Empty;
         if (!_config.Profiles.TryGetValue(_currentProfile, out var p)) return;
-        ApplyVkState(p.Vk);
+        // ★旧プロファイル (Render 空) は Vk bool から補完する。
+        SetRender(string.IsNullOrEmpty(p.Render) ? (p.Vk ? "zink" : "off") : p.Render.Trim().ToLowerInvariant());
         _chkSafe.Checked = p.SafeMode;
         _config.Agents = p.Agents.Select(a => new AgentEntry
         {
@@ -501,6 +559,9 @@ internal sealed class MainForm : Form
             ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha, Args = a.Args ?? string.Empty,
         }).ToList();
         RefreshAgentSummary();
+        // ★復元直後に前回値との一致/不一致を出す。初回承認ダイアログを
+        //   「前回からの変化」と区別できるようにするため。
+        ReportProfileAgentStatus(p);
         _txtExtra.Text = p.Extra;
         _txtXms.Value = ClampGb(p.XmsGb);
         _txtXmx.Value = ClampGb(p.XmxGb);
@@ -521,6 +582,8 @@ internal sealed class MainForm : Form
         _config.Profiles[name] = new LaunchProfile
         {
             Vk = GetVkState() == 1,
+            // ★描画モードもプロファイルに記録する (unknown は off 正規化)。
+            Render = GetVkState() == 1 ? (_config.Render == "d3d12" ? "d3d12" : "zink") : "off",
             SafeMode = _chkSafe.Checked,
             Extra = _txtExtra.Text.Trim(),
             ManualText = _config.ManualText,
@@ -579,6 +642,8 @@ internal sealed class MainForm : Form
         _config.Profiles[_currentProfile] = new LaunchProfile
         {
             Vk = GetVkState() == 1,
+            // ★描画モードもプロファイルに記録する (unknown は off 正規化)。
+            Render = GetVkState() == 1 ? (_config.Render == "d3d12" ? "d3d12" : "zink") : "off",
             SafeMode = _chkSafe.Checked,
             Extra = _txtExtra.Text.Trim(),
             ManualText = _config.ManualText,
@@ -644,6 +709,77 @@ internal sealed class MainForm : Form
             return Path.GetFullPath(t).TrimEnd(Path.DirectorySeparatorChar).ToLowerInvariant();
         }
         catch { return p.Trim().ToLowerInvariant(); }
+    }
+
+    /// <summary>
+    /// ★起動フローで確定した承認状態 (ApprovedSha/PendingSha) を、選択中の
+    ///   プロファイルの退避に書き戻す。これが無いと LoadSelectedProfile が
+    ///   古い退避値で _config.Agents を差し替え、承認済みのはずの jar が
+    ///   「新規」扱いに戻る。退避は相対パスのまま残ることがあるので、
+    ///   一致判定は GamePath 基準の絶対パス正規化で行う。
+    /// </summary>
+    private void SyncAgentShaToProfile()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_currentProfile) ||
+                !_config.Profiles.TryGetValue(_currentProfile, out var p)) return;
+            var gameDir = _txtGamePath.Text.Trim();
+            foreach (var pa in p.Agents)
+            {
+                var key = NormalizeAgentPath(ResolveAgentAbs(gameDir, pa.JarPath));
+                var now = _config.Agents.FirstOrDefault(
+                    b => NormalizeAgentPath(ResolveAgentAbs(gameDir, b.JarPath)) == key);
+                if (now == null) continue;
+                pa.ApprovedSha = now.ApprovedSha;
+                pa.PendingSha = now.PendingSha;
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// ★プロファイル復元直後に、保存されている前回値と現在の jar の
+    ///   一致/不一致をログに出す。起動時の承認フローと同じ判定規準で、
+    ///   通常の一致は静か、変化と未承認だけが出る。
+    /// </summary>
+    private void ReportProfileAgentStatus(LaunchProfile p)
+    {
+        try
+        {
+            var gameDir = _txtGamePath.Text.Trim();
+            foreach (var a in p.Agents.Where(x => x.Enabled))
+            {
+                var tag = Path.GetFileName(a.JarPath);
+                var cur = Javamod.Sha256(ResolveAgentAbs(gameDir, a.JarPath));
+                if (string.IsNullOrEmpty(cur))
+                {
+                    Log(string.Format(L.T("log.profile.agent.missing", "Agent file not found: {0}."), tag));
+                    continue;
+                }
+                var shortCur = cur.Length >= 8 ? cur.Substring(0, 8) : "?";
+                if (string.IsNullOrEmpty(a.ApprovedSha) && string.IsNullOrEmpty(a.PendingSha))
+                {
+                    Log(string.Format(L.T("log.profile.agent.new", "Agent not approved yet (asked at launch): {0}."), tag));
+                    continue;
+                }
+                if (cur == a.ApprovedSha)
+                {
+                    var shortApr = a.ApprovedSha.Length >= 8 ? a.ApprovedSha.Substring(0, 8) : "?";
+                    Log(string.Format(L.T("log.profile.agent.match", "Agent matches approval: {0} (sha {1})."), tag, shortApr));
+                    continue;
+                }
+                if (!string.IsNullOrEmpty(a.PendingSha) && cur == a.PendingSha)
+                {
+                    Log(string.Format(L.T("log.profile.agent.pending", "Agent matches recorded update (asked at launch): {0}."), tag));
+                    continue;
+                }
+                var shortOld = a.ApprovedSha.Length >= 8 ? a.ApprovedSha.Substring(0, 8) : "?";
+                Log(string.Format(L.T("log.profile.agent.changed", "Agent changed since approval: {0} (sha {1} -> {2})."),
+                    tag, shortOld, shortCur));
+            }
+        }
+        catch { }
     }
 
     private void OpenManualEditor()
@@ -732,7 +868,10 @@ internal sealed class MainForm : Form
     private void SaveSettings()
     {
         _config.GamePath = _txtGamePath.Text.Trim();
-        _config.Vk = GetVkState() == 1;
+        // ★実効モードを設定に写す (unknown は off 正規化)。旧 Vk も併記して互換維持。
+        var render = ResolvedRender();
+        _config.Render = render == "unknown" ? "off" : render;
+        _config.Vk = render == "zink" || render == "d3d12";
         _config.SafeMode = _chkSafe.Checked;
         _config.Extra = _txtExtra.Text.Trim();
         _config.XmsGb = (int)_txtXms.Value;
@@ -747,25 +886,27 @@ internal sealed class MainForm : Form
         var log = new List<string>();
         try
         {
-            bool vkOn = GetVkState() == 1;
-            if (vkOn)
+            // ★実効モード: オフ (ネイティブGL) / zink (Vulkan) / d3d12 (GL over D3D12)。
+            var render = ResolvedRender();
+            if (render == "zink" || render == "d3d12")
             {
-                var r = Preflight.CheckVk(gameDir);
+                var r = Preflight.CheckVk(gameDir, render == "zink");
                 log.AddRange(r.Messages);
                 if (!r.Ok) { FlushLog(log); return; }
             }
-            else if (GetVkState() == -1)
+            else if (render == "unknown")
             {
-                log.Add(L.T("log.vk.unknown", "VK state unknown. Launching native."));
+                log.Add(L.T("log.vk.unknown", "Mesa files not found (state unknown). Launching native GL."));
             }
             var psi = new ProcessStartInfo(Path.Combine(gameDir, "jre64", "bin", "java.exe"))
             {
                 WorkingDirectory = gameDir,
                 UseShellExecute = false,
             };
-            if (vkOn)
+            if (render != "off" && render != "unknown")
             {
-                psi.Environment["GALLIUM_DRIVER"] = "zink";
+                // ★値がそのままドライバ名として効く ("zink" | "d3d12")。
+                psi.Environment["GALLIUM_DRIVER"] = render;
             }
             else
             {
@@ -848,6 +989,9 @@ internal sealed class MainForm : Form
                         changed.Add((ag, cur));
                     }
                 }
+                // ★確定した承認状態をプロファイル退避に反映してから保存する。
+                //   これが無いと選択中プロファイルの退避が古いまま残る。
+                SyncAgentShaToProfile();
                 _config.Save();
                 if (firstSeen.Count > 0)
                 {
@@ -867,6 +1011,7 @@ internal sealed class MainForm : Form
                         ag.ApprovedSha = Javamod.Sha256(ag.JarPath);
                         ag.PendingSha = string.Empty;
                     }
+                    SyncAgentShaToProfile();
                     _config.Save();
                     log.Add(L.T("log.sha.firstseen.ok", "New agents approved."));
                 }
@@ -900,6 +1045,7 @@ internal sealed class MainForm : Form
                         ag.ApprovedSha = ag.PendingSha;
                         ag.PendingSha = string.Empty;
                     }
+                    SyncAgentShaToProfile();
                     _config.Save();
                     log.Add(L.T("log.sha.pending.ok", "Updates approved."));
                 }
@@ -957,7 +1103,7 @@ internal sealed class MainForm : Form
                 throw;
             }
             SaveSettings();
-            log.Add(L.T("log.launched", "Launched (VK=") + (vkOn ? "ON" : "OFF") + ")");
+            log.Add(L.T("log.launched", "Launched (renderer=") + render + ")");
         }
         catch (Exception ex) { log.Add(L.T("log.launchfail", "Launch failed: ") + ex.Message); }
         FlushLog(log);

@@ -10,6 +10,11 @@ internal sealed class AppConfig
     public string GamePath { get; set; } = string.Empty;
     public string MagpieExe { get; set; } = string.Empty;
     public bool Vk { get; set; } = true;
+    /// <summary>
+    /// ★描画モード。"zink" (GL→Vulkan) / "d3d12" (GL→D3D12 (Dozen)) / "off" (ネイティブGL)。
+    ///   空は旧 Vk bool 扱いで、Load 時に補完する。
+    /// </summary>
+    public string Render { get; set; } = string.Empty;
     public string Extra { get; set; } = string.Empty;
     public string ManualText { get; set; } = string.Empty;
     public bool SafeMode { get; set; }
@@ -32,6 +37,9 @@ internal sealed class AppConfig
             {
                 var json = File.ReadAllText(ConfigPath);
                 cfg = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+                // ★旧 Vk bool のみの設定を 3値モードへ補完する。
+                if (string.IsNullOrEmpty(cfg.Render))
+                    cfg.Render = cfg.Vk ? "zink" : "off";
                 if (cfg.Agents.Count == 0)
                 {
                     try
@@ -69,6 +77,8 @@ internal sealed class AppConfig
 internal sealed class LaunchProfile
 {
     public bool Vk { get; set; } = true;
+    /// <summary>★"zink" | "d3d12" | "off"。空は旧 Vk bool 扱い (適用時に補完)。</summary>
+    public string Render { get; set; } = string.Empty;
     public string Extra { get; set; } = string.Empty;
     public string ManualText { get; set; } = string.Empty;
     public bool SafeMode { get; set; }

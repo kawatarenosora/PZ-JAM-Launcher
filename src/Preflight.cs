@@ -14,19 +14,25 @@ internal sealed class CheckResult
 
 internal static class Preflight
 {
-    public static CheckResult CheckVk(string gameDir)
+    /// <summary>
+    /// ★Mesa 導入チェック。<paramref name="zink"/> (VK (Zink)) のときだけ
+    ///   Vulkan ランタイム (vulkan-1.dll) も要求する。D3D12 (Dozen) モードは
+    ///   Vulkan 不要で、Mesa 側の DLL が揃っていればよい。
+    /// </summary>
+    public static CheckResult CheckVk(string gameDir, bool zink)
     {
         var r = new CheckResult { Ok = true };
+        var tag = zink ? "[VK]" : "[D3D12]";
         var jb = Path.Combine(gameDir, "jre64", "bin");
         void Need(string p, string label)
         {
-            if (!File.Exists(p)) { r.Ok = false; r.Messages.Add("[VK] " + label + L.T("check.vk.missing", " missing: ") + p); }
+            if (!File.Exists(p)) { r.Ok = false; r.Messages.Add(tag + " " + label + L.T("check.vk.missing", " missing: ") + p); }
         }
         Need(Path.Combine(jb, "opengl32.dll"), "opengl32.dll(jre64)");
         Need(Path.Combine(jb, "libgallium_wgl.dll"), "libgallium_wgl.dll(jre64)");
         Need(Path.Combine(gameDir, "opengl32.dll"), "opengl32.dll(root)");
-        Need(Path.Combine(Environment.SystemDirectory, "vulkan-1.dll"), "vulkan-1.dll");
-        if (r.Ok) r.Messages.Add("[VK] OK");
+        if (zink) Need(Path.Combine(Environment.SystemDirectory, "vulkan-1.dll"), "vulkan-1.dll");
+        if (r.Ok) r.Messages.Add(tag + " OK");
         return r;
     }
 

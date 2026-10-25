@@ -41,7 +41,7 @@ internal sealed class AgentsForm : Form
         _rows = config.Agents.Select(a => new AgentEntry
         {
             Enabled = a.Enabled, JarPath = a.JarPath, Gate = string.IsNullOrEmpty(a.Gate) ? "lenient" : a.Gate,
-            Sha256 = a.Sha256,
+            Sha256 = a.Sha256, ApprovedSha = a.ApprovedSha, PendingSha = a.PendingSha,
             Args = a.Args ?? string.Empty,
         }).ToList();
         BuildUi();
@@ -227,9 +227,10 @@ internal sealed class AgentsForm : Form
     {
         for (var i = 0; i < _rows.Count && i < _clb.Items.Count; i++)
             _rows[i].Enabled = _clb.GetItemChecked(i);
-        foreach (var a in _rows)
-            if (!string.IsNullOrEmpty(a.ApprovedSha) || !string.IsNullOrEmpty(a.PendingSha) || !string.IsNullOrEmpty(a.Sha256))
-                a.Sha256 = Javamod.Sha256(a.JarPath);
+        // ★Sha256 は旧設定を ApprovedSha へ繰り上げるための退避値であって、
+        //   現在値ではない。ここで現在のファイルハッシュを書き込むと、
+        //   MigrateAgentSha が更新後の jar を無承認のまま通してしまう。
+        //   承認の記録は起動時フローに一任するので、ここでは触らない。
         _config.Agents = _rows;
     }
 }

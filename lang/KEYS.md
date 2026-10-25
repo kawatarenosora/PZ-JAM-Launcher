@@ -4,7 +4,7 @@
 
 | Key | English |
 |---|---|
-| `app.title` | PZ JAM Launcher (test) |
+| `app.title` | PZ JAM Launcher (version appended automatically) |
 | `left.lang` | Language |
 | `left.gamepath` | Game folder |
 | `left.autodetect` | Auto-detect |
@@ -15,6 +15,10 @@
 | `left.profiles` | Profiles |
 | `left.new` | New |
 | `left.delete` | Delete |
+| `right.render` | Renderer |
+| `render.off` | Off |
+| `render.zink` | VK (Zink) |
+| `render.d3d12` | D3D12 |
 | `right.vk` | VK (Zink) |
 | `right.vk.note` | Only when installed manually. Not recommended on Mac. |
 | `right.magstart` | Start Magpie |
@@ -47,6 +51,11 @@
 | `log.magpie.notrunning` | [FSR] Magpie is not running. |
 | `log.magpie.killed` | [FSR] Magpie killed. |
 | `log.magpie.killfail` | [FSR] Failed to kill Magpie. |
+| `log.profile.agent.changed` | Agent changed since approval: {0} (sha {1} -> {2}). |
+| `log.profile.agent.match` | Agent matches approval: {0} (sha {1}). |
+| `log.profile.agent.missing` | Agent file not found: {0}. |
+| `log.profile.agent.new` | Agent not approved yet (asked at launch): {0}. |
+| `log.profile.agent.pending` | Agent matches recorded update (asked at launch): {0}. |
 | `log.profile.load` | Profile loaded:  |
 | `dlg.profilename` | Profile name |
 | `log.profile.noselect` | No profile selected. |
@@ -63,6 +72,7 @@
 | `log.steam.opened` | Steam opened. |
 | `log.steam.fail` | Failed to open Steam:  |
 | `log.gamepath.invalid` | Invalid game folder. |
+| `log.mesa.d3d12` | D3D12: Mesa restored (GL over D3D12). |
 | `log.mesa.restored` | Mesa restored: {0}. |
 | `log.mesa.stashfail` | Mesa stash failed {0}: {1}. |
 | `log.mesa.stashed` | VK OFF: Mesa stashed (native GL). |
@@ -77,7 +87,7 @@
 | `log.agent.applied` | Agent applied [{0}] jar={1} sha={2} rev={3}. |
 | `log.agent.off` | No agents enabled. |
 | `log.mesa.restored.done` | Mesa restored. |
-| `log.launched` | Launched (VK= |
+| `log.launched` | Launched (renderer= |
 | `log.launchfail` | Launch failed:  |
 | `agents.title` | Manage Agents |
 | `agents.add` | Add... |

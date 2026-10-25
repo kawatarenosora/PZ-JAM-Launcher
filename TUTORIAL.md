@@ -86,6 +86,18 @@ Example: converting the stock `ProjectZomboid64.json` (preset 4 era):
 
 > **⚠ Use only Agent mods you trust. Using unchecked suspicious mods is at your own risk.**
 
+### `args:` (per row)
+
+Optional field under the list. If set, the launcher appends it after the jar as
+`-javaagent:<jar>=<args>`. That string is handed **to the agent itself** (the `<args>`
+part of `-javaagent`), not to the JVM.
+
+- Blank = nothing is appended.
+- Only write what the agent's own readme says it reads from that string. JVM flags do
+  NOT work here — `-Dfoo=bar` never reaches `System.getProperty` through this route.
+- Example: if the agent readme documents `debug=1`, enter `debug=1`. Multiple values go
+  space-separated (e.g. `debug=1 verbose=2`) and are passed as-is, without validation.
+
 ### Gates (per row)
 
 The gate compares the agent's built-in revision against the game revision:

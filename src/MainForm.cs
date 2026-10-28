@@ -25,6 +25,10 @@ internal sealed class MainForm : Form
     private System.Windows.Forms.Timer _watch;
     private CheckBox _chkSafe;
     private Label _lblAgents;
+    private Label _lblZb;
+    private Button _btnZbInstall;
+    private Button _btnZbToggle;
+    private Button _btnZbUninstall;
     private ComboBox _cmbRender;
     private bool _suspendRender;
     private Label _lblVk;
@@ -53,6 +57,7 @@ internal sealed class MainForm : Form
         _txtGamePath.Text = _config.GamePath;
         _chkSafe.Checked = _config.SafeMode;
         RefreshAgentSummary();
+        RefreshZbRow();
         _txtExtra.Text = _config.Extra;
         _txtXms.Value = ClampGb(_config.XmsGb);
         _txtXmx.Value = ClampGb(_config.XmxGb);
@@ -184,6 +189,24 @@ internal sealed class MainForm : Form
         rowAgent.Controls.Add(btnAgents);
         rowAgent.Controls.Add(_lblAgents);
         right.Controls.Add(rowAgent);
+
+        // ★ZombieBuddy (Workshop 3619862853) 行。未導入で導入ソースがあれば
+        //   Install、導入済みなら Enable/Disable トグルと Uninstall を出す。
+        //   ソースもファイルも無ければ何もしない (表示のみ)。
+        var rowZb = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+        _lblZb = new Label { Text = "?", AutoSize = true };
+        _btnZbInstall = new Button { Text = L.T("zb.install", "Install"), AutoSize = true };
+        _btnZbInstall.Click += (_, _) => ZbInstall();
+        _btnZbToggle = new Button { AutoSize = true };
+        _btnZbToggle.Click += (_, _) => ZbToggle();
+        _btnZbUninstall = new Button { Text = L.T("zb.uninstall", "Uninstall"), AutoSize = true };
+        _btnZbUninstall.Click += (_, _) => ZbUninstall();
+        rowZb.Controls.Add(new Label { Text = L.T("right.zb", "ZombieBuddy:"), AutoSize = true, TextAlign = ContentAlignment.MiddleLeft });
+        rowZb.Controls.Add(_lblZb);
+        rowZb.Controls.Add(_btnZbInstall);
+        rowZb.Controls.Add(_btnZbToggle);
+        rowZb.Controls.Add(_btnZbUninstall);
+        right.Controls.Add(rowZb);
 
         var rowMem = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         rowMem.Controls.Add(new Label { Text = "-Xms", AutoSize = true });
@@ -435,6 +458,9 @@ internal sealed class MainForm : Form
         bool running = false;
         try { running = IsGameRunning(); } catch { }
         if (_cmbRender != null) _cmbRender.Enabled = !running;
+        if (_btnZbInstall != null) _btnZbInstall.Enabled = !running;
+        if (_btnZbToggle != null) _btnZbToggle.Enabled = !running;
+        if (_btnZbUninstall != null) _btnZbUninstall.Enabled = !running;
         if (_btnLaunch == null) return;
         if (string.IsNullOrEmpty(_currentProfile) || !_config.Profiles.ContainsKey(_currentProfile))
         {
@@ -472,6 +498,7 @@ internal sealed class MainForm : Form
         _txtGamePath.Text = cands[0];
         if (cands.Count > 1) Log(L.T("log.multigame", "Multiple found. Using first: ") + cands[0]);
         RefreshVersion();
+        RefreshZbRow();
         Log(L.T("log.gamepath", "Game folder: ") + cands[0]);
     }
 
@@ -482,6 +509,7 @@ internal sealed class MainForm : Form
         {
             _txtGamePath.Text = dlg.SelectedPath;
             RefreshVersion();
+            RefreshZbRow();
         }
     }
 
@@ -552,6 +580,9 @@ internal sealed class MainForm : Form
         if (!_config.Profiles.TryGetValue(_currentProfile, out var p)) return;
         // ★旧プロファイル (Render 空) は Vk bool から補完する。
         SetRender(string.IsNullOrEmpty(p.Render) ? (p.Vk ? "zink" : "off") : p.Render.Trim().ToLowerInvariant());
+        // ★ZombieBuddy 設定も反映 (空なら現行動作: ファイル在席時 on)。
+        _config.Zb = string.IsNullOrEmpty(p.Zb) ? (EffectiveZb() == "on" ? "on" : "off") : p.Zb.Trim().ToLowerInvariant();
+        RefreshZbRow();
         _chkSafe.Checked = p.SafeMode;
         _config.Agents = p.Agents.Select(a => new AgentEntry
         {
@@ -584,6 +615,7 @@ internal sealed class MainForm : Form
             Vk = GetVkState() == 1,
             // ★描画モードもプロファイルに記録する (unknown は off 正規化)。
             Render = GetVkState() == 1 ? (_config.Render == "d3d12" ? "d3d12" : "zink") : "off",
+            Zb = EffectiveZb(),
             SafeMode = _chkSafe.Checked,
             Extra = _txtExtra.Text.Trim(),
             ManualText = _config.ManualText,
@@ -644,6 +676,7 @@ internal sealed class MainForm : Form
             Vk = GetVkState() == 1,
             // ★描画モードもプロファイルに記録する (unknown は off 正規化)。
             Render = GetVkState() == 1 ? (_config.Render == "d3d12" ? "d3d12" : "zink") : "off",
+            Zb = EffectiveZb(),
             SafeMode = _chkSafe.Checked,
             Extra = _txtExtra.Text.Trim(),
             ManualText = _config.ManualText,
@@ -669,6 +702,120 @@ internal sealed class MainForm : Form
                 _config.Agents.Count, en);
         }
         catch { _lblAgents.Text = "-"; }
+    }
+
+    /// <summary>
+    /// ★ZombieBuddy の実効設定。"on" / "off"。設定が空なら旧動作
+    ///   (zbNative.dll + ZombieBuddy.jar が揃っていれば on) を踏襲する。
+    /// </summary>
+    private string EffectiveZb()
+    {
+        if (!string.IsNullOrEmpty(_config.Zb)) return _config.Zb;
+        var st = ZombieBuddy.Detect(_txtGamePath.Text.Trim());
+        return st.Installed ? "on" : "off";
+    }
+
+    /// <summary>★ZombieBuddy 行の表示とボタン出し分け。</summary>
+    private void RefreshZbRow()
+    {
+        if (_lblZb == null || _btnZbInstall == null) return;
+        try
+        {
+            var gd = _txtGamePath.Text.Trim();
+            var st = ZombieBuddy.Detect(gd);
+            bool running = false;
+            try { running = IsGameRunning(); } catch { }
+            _btnZbInstall.Visible = false;
+            _btnZbToggle.Visible = false;
+            _btnZbUninstall.Visible = false;
+            if (st.Installed)
+            {
+                var on = EffectiveZb() == "on";
+                _lblZb.Text = L.T(on ? "zb.on" : "zb.off", on ? "on" : "off");
+                _lblZb.ForeColor = on ? Color.Green : Color.Red;
+                _btnZbToggle.Text = L.T(on ? "zb.disable" : "zb.enable", on ? "Disable" : "Enable");
+                _btnZbToggle.Visible = true;
+                _btnZbUninstall.Visible = true;
+            }
+            else if (st.Present)
+            {
+                // ★片方欠け。修復 (再導入) と除去の両方を出す。
+                _lblZb.Text = L.T("zb.broken", "incomplete");
+                _lblZb.ForeColor = Color.DarkOrange;
+                _btnZbInstall.Visible = true;
+                _btnZbUninstall.Visible = true;
+            }
+            else if (!string.IsNullOrEmpty(st.SourceLibs))
+            {
+                // ★未導入だが Workshop content / mods にソースがある → 代行導入を出す。
+                _lblZb.Text = L.T("zb.notinstalled", "not installed");
+                _lblZb.ForeColor = Color.Black;
+                _btnZbInstall.Visible = true;
+            }
+            else
+            {
+                // ★ソース無し。何もしない (表示のみ)。
+                _lblZb.Text = L.T("zb.notinstalled", "not installed");
+                _lblZb.ForeColor = Color.Black;
+            }
+            _btnZbInstall.Enabled = !running;
+            _btnZbToggle.Enabled = !running;
+            _btnZbUninstall.Enabled = !running;
+        }
+        catch { _lblZb.Text = "?"; }
+    }
+
+    private void ZbInstall()
+    {
+        var gd = _txtGamePath.Text.Trim();
+        if (string.IsNullOrEmpty(gd) || !Directory.Exists(gd)) { Log(L.T("log.nogame", "Game not found. Specify manually.")); return; }
+        var src = ZombieBuddy.FindSourceLibsDir();
+        if (string.IsNullOrEmpty(src)) { Log(L.T("log.zb.nosource", "ZombieBuddy install source not found (subscribe to the Workshop mod, or extract it to Zomboid\\mods\\ZombieBuddy).")); return; }
+        var err = ZombieBuddy.Install(gd, src);
+        if (!string.IsNullOrEmpty(err)) { Log(L.T("log.zb.installfail", "ZombieBuddy install failed: ") + err); return; }
+        // ★明示的に導入したので、旧設定 (空) でも on に確定させる。
+        if (string.IsNullOrEmpty(_config.Zb)) _config.Zb = "on";
+        _config.Save();
+        Log(L.T("log.zb.installed", "ZombieBuddy installed from: ") + src);
+        RefreshZbRow();
+    }
+
+    private void ZbToggle()
+    {
+        var next = EffectiveZb() == "on" ? "off" : "on";
+        _config.Zb = next;
+        _config.Save();
+        Log(L.T(next == "on" ? "log.zb.toggled.on" : "log.zb.toggled.off",
+            next == "on" ? "ZombieBuddy enabled." : "ZombieBuddy disabled for this launcher."));
+        RefreshZbRow();
+    }
+
+    private void ZbUninstall()
+    {
+        var gd = _txtGamePath.Text.Trim();
+        var st = ZombieBuddy.Detect(gd);
+        // ★json / bat にパッチが残っていると、ランチャー外の起動で
+        //   zbNative.dll 探しに失敗して JVM が即死する。先に警告する。
+        var ext = new List<string>();
+        if (st.JsonPatched) ext.Add("ProjectZomboid64.json");
+        if (st.BatPatched) ext.Add("ProjectZomboid64.bat");
+        var msg = L.T("zb.uninstall.confirm", "Remove ZombieBuddy files from the game folder?");
+        if (ext.Count > 0)
+            msg += "\n\n" + string.Format(L.T("zb.uninstall.extwarn",
+                "Note: -agentlib:zbNative remains in {0}. Launching outside this launcher will fail until it is removed (use the official installer's uninstall)."),
+                string.Join(", ", ext));
+        var r = MessageBox.Show(this, msg, "ZombieBuddy", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        if (r != DialogResult.Yes) return;
+        var err = ZombieBuddy.Uninstall(gd);
+        if (!string.IsNullOrEmpty(err)) { Log(L.T("log.zb.uninstallfail", "ZombieBuddy uninstall failed: ") + err); return; }
+        _config.Zb = "off";
+        _config.Save();
+        Log(L.T("log.zb.uninstalled", "ZombieBuddy files removed."));
+        if (ext.Count > 0)
+            Log(string.Format(L.T("zb.uninstall.extwarn",
+                "Note: -agentlib:zbNative remains in {0}. Launching outside this launcher will fail until it is removed (use the official installer's uninstall)."),
+                string.Join(", ", ext)));
+        RefreshZbRow();
     }
 
     private static string ResolveAgentAbs(string gameDir, string raw)
@@ -912,7 +1059,13 @@ internal sealed class MainForm : Form
             {
                 psi.Environment.Remove("GALLIUM_DRIVER");
             }
-            psi.Environment["_JAVA_OPTIONS"] = File.Exists(Path.Combine(gameDir, "zbNative.dll")) ? "-agentlib:zbNative" : string.Empty;
+            // ★_JAVA_OPTIONS はユーザーの環境変数がゲームへ漏れ込むのを遮断する
+            //   意味でも空で固定する。ZombieBuddy は下記の通り VM オプションとして
+            //   直接渡す (zbNative.c は -- を見ない。公式 doc の「-- 必須」は PZ
+            //   小型ランチャー / Steam 起動オプション経由の話で、java.exe 直起動の
+            //   ここでは渡すと Unrecognized option で落ちる。実測済み)。
+            psi.Environment["_JAVA_OPTIONS"] = string.Empty;
+            var zbState = ZombieBuddy.Detect(gameDir);
 
             string mainClass = "zombie.gameStates.MainScreenState";
             string classpath = "./;projectzomboid.jar";
@@ -920,6 +1073,29 @@ internal sealed class MainForm : Form
             psi.ArgumentList.Add("--enable-native-access=ALL-UNNAMED");
             psi.ArgumentList.Add("--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED");
             psi.ArgumentList.Add("-Dzomboid.steam=1");
+            if (zbState.Installed)
+            {
+                if (EffectiveZb() == "on")
+                {
+                    psi.ArgumentList.Add("-agentlib:zbNative");
+                    log.Add(L.T("log.zb.on", "ZombieBuddy: -agentlib:zbNative applied."));
+                }
+                else
+                {
+                    log.Add(L.T("log.zb.off", "ZombieBuddy: disabled (profile)."));
+                }
+                // ★ランチャー外 (Steam 直接 / bat) でも ZB が有効な場合の表示。
+                var zbExt = new List<string>();
+                if (zbState.JsonPatched) zbExt.Add("ProjectZomboid64.json");
+                if (zbState.BatPatched) zbExt.Add("ProjectZomboid64.bat");
+                if (zbExt.Count > 0)
+                    log.Add(string.Format(L.T("log.zb.external", "ZombieBuddy is also active outside this launcher ({0} patched)."), string.Join(", ", zbExt)));
+            }
+            else if (EffectiveZb() == "on")
+            {
+                log.Add(string.Format(L.T("log.zb.broken", "ZombieBuddy enabled but files incomplete (dll={0} jar={1}). Launching without it."),
+                    zbState.Dll ? "yes" : "no", zbState.Jar ? "yes" : "no"));
+            }
             var xms = (int)_txtXms.Value;
             var xmx = (int)_txtXmx.Value;
             if (xms > xmx) xms = xmx;

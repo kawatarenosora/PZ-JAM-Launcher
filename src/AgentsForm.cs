@@ -173,6 +173,15 @@ internal sealed class AgentsForm : Form
     {
         using var dlg = new OpenFileDialog { Filter = L.T("agents.filter", "agent jar|*.jar"), Title = L.T("agents.choosetitle", "Select agent jar") };
         if (dlg.ShowDialog() != DialogResult.OK) return;
+        // ★ZombieBuddy.jar は Windows では zbNative.dll がロードする。ここで
+        //   -javaagent に加えると二重ロードになるので警告する。
+        if (Path.GetFileName(dlg.FileName).Equals(ZombieBuddy.JarName, StringComparison.OrdinalIgnoreCase))
+        {
+            var r = MessageBox.Show(this,
+                L.T("zb.dupagent.msg", "ZombieBuddy.jar is loaded via zbNative.dll on Windows. Adding it here as -javaagent would load it twice. Add anyway?"),
+                "ZombieBuddy", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (r != DialogResult.Yes) return;
+        }
         _rows.Add(new AgentEntry { Enabled = true, JarPath = dlg.FileName, Gate = "lenient" });
         _log(L.T("log.agents.added", "Agent added: ") + dlg.FileName);
         RefreshList();

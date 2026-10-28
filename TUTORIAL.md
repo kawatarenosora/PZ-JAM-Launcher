@@ -108,7 +108,30 @@ The gate compares the agent's built-in revision against the game revision:
 
 Mismatch/warn/excluded reasons appear per row in the launch log. In **Safe mode** all agents are excluded.
 
-## 6. Launch
+Mismatch/warn/excluded reasons appear per row in the launch log. In **Safe mode** all agents are excluded.
+
+## 6. ZombieBuddy row
+
+The launcher detects [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the
+Java-mod framework (Workshop mod `3619862853`). When it is not installed but its
+Workshop content (or a manual `Zomboid\mods\ZombieBuddy` copy) is present, an
+**Install** button copies `zbNative.dll` and `ZombieBuddy.jar` into the game
+folder for you — no need to run the official installer for launcher-only use.
+
+Once installed:
+
+- **Enable / Disable** toggles whether launches attach `-agentlib:zbNative`.
+  Disabled still leaves the files in place; re-enabling needs no reinstall.
+  The setting is stored per profile.
+- **Uninstall** deletes `zbNative.dll`, `ZombieBuddy.jar` and any pending
+  `ZombieBuddy.jar.new`. If `ProjectZomboid64.json` or `ProjectZomboid64.bat`
+  still contain `-agentlib:zbNative` (from the official installer), the launcher
+  warns you: those launches outside this launcher would fail until cleaned up.
+
+The launcher never adds the trailing `--` — that separator belongs to PZ's own
+starter when launching through Steam, not to a direct `java.exe` invocation.
+
+## 7. Launch
 
 1. Select a profile → **Launch**
 2. While running, the button becomes **Kill** (use only when frozen; mid-play kills may corrupt saves)

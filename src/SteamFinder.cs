@@ -29,13 +29,16 @@ internal static class SteamFinder
         return string.Empty;
     }
 
-    public static List<string> FindGameCandidates()
+    /// <summary>
+    /// ★Steam の全ライブラリの steamapps ディレクトリを返す (本体 + libraryfolders.vdf)。
+    ///   Workshop content の探索などに使う。
+    /// </summary>
+    public static List<string> GetLibrarySteamappsDirs()
     {
-        var result = new List<string>();
+        var libs = new List<string>();
         var steamDir = GetSteamDir();
-        if (string.IsNullOrEmpty(steamDir)) return result;
-
-        var libs = new List<string> { Path.Combine(steamDir, "steamapps") };
+        if (string.IsNullOrEmpty(steamDir)) return libs;
+        libs.Add(Path.Combine(steamDir, "steamapps"));
         var foldersFile = Path.Combine(steamDir, "steamapps", "libraryfolders.vdf");
         if (File.Exists(foldersFile))
         {
@@ -51,8 +54,13 @@ internal static class SteamFinder
             }
             catch { }
         }
+        return libs;
+    }
 
-        foreach (var apps in libs)
+    public static List<string> FindGameCandidates()
+    {
+        var result = new List<string>();
+        foreach (var apps in GetLibrarySteamappsDirs())
         {
             try
             {

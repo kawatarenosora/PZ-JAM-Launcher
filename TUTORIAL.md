@@ -118,15 +118,25 @@ Workshop content (or a manual `Zomboid\mods\ZombieBuddy` copy) is present, an
 **Install** button copies `zbNative.dll` and `ZombieBuddy.jar` into the game
 folder for you — no need to run the official installer for launcher-only use.
 
+Installing / uninstalling **is** enabling / disabling: launches attach
+`-agentlib:zbNative` whenever the files are present. There is no separate
+toggle, and the setting is not stored per profile.
+
 Once installed:
 
-- **Enable / Disable** toggles whether launches attach `-agentlib:zbNative`.
-  Disabled still leaves the files in place; re-enabling needs no reinstall.
-  The setting is stored per profile.
+- **update available** (orange) means the game-folder `ZombieBuddy.jar` no
+  longer matches the Workshop source (SHA-256). A launch still works, and the
+  warning is only logged; press **Install** to overwrite with the current
+  Workshop version.
 - **Uninstall** deletes `zbNative.dll`, `ZombieBuddy.jar` and any pending
-  `ZombieBuddy.jar.new`. If `ProjectZomboid64.json` or `ProjectZomboid64.bat`
-  still contain `-agentlib:zbNative` (from the official installer), the launcher
-  warns you: those launches outside this launcher would fail until cleaned up.
+  `ZombieBuddy.jar.new` / `ZombieBuddy.jar.bak`. It also removes `ZombieBuddy`
+  from the client-side mod lists (`Zomboid\Lua\pz_modlist_settings.cfg` and
+  each save's `mods.txt`) — with ZB still listed, a game without the agent
+  fails to start (known ZombieBuddy issue). Re-install does **not** re-add it;
+  enable the mod again in the in-game mod manager. If `ProjectZomboid64.json`
+  or `ProjectZomboid64.bat` still contain `-agentlib:zbNative` (from the
+  official installer), the launcher warns you: those launches outside this
+  launcher would fail until cleaned up.
 
 The launcher never adds the trailing `--` — that separator belongs to PZ's own
 starter when launching through Steam, not to a direct `java.exe` invocation.

@@ -15,11 +15,6 @@ internal sealed class AppConfig
     ///   空は旧 Vk bool 扱いで、Load 時に補完する。
     /// </summary>
     public string Render { get; set; } = string.Empty;
-    /// <summary>
-    /// ★ZombieBuddy。"on" (起動時に -agentlib:zbNative を付与) / "off" (付けない)。
-    ///   空は旧動作 (zbNative.dll+jar が揃っていれば on)。
-    /// </summary>
-    public string Zb { get; set; } = string.Empty;
     public string Extra { get; set; } = string.Empty;
     public string ManualText { get; set; } = string.Empty;
     public bool SafeMode { get; set; }
@@ -84,8 +79,6 @@ internal sealed class LaunchProfile
     public bool Vk { get; set; } = true;
     /// <summary>★"zink" | "d3d12" | "off"。空は旧 Vk bool 扱い (適用時に補完)。</summary>
     public string Render { get; set; } = string.Empty;
-    /// <summary>★"on" | "off"。空は旧動作 (ZB ファイル在席時 on)。</summary>
-    public string Zb { get; set; } = string.Empty;
     public string Extra { get; set; } = string.Empty;
     public string ManualText { get; set; } = string.Empty;
     public bool SafeMode { get; set; }

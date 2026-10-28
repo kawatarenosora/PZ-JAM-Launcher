@@ -22,26 +22,23 @@
 | `right.zb` | ZombieBuddy: |
 | `zb.notinstalled` | not installed |
 | `zb.broken` | incomplete |
-| `zb.on` | on |
-| `zb.off` | off |
 | `zb.install` | Install |
-| `zb.enable` | Enable |
-| `zb.disable` | Disable |
+| `zb.installed` | installed |
+| `zb.update` | update available |
 | `zb.uninstall` | Uninstall |
 | `zb.uninstall.confirm` | Remove ZombieBuddy files from the game folder? |
 | `zb.uninstall.extwarn` | Note: -agentlib:zbNative remains in {0}... |
 | `zb.dupagent.msg` | ZombieBuddy.jar is loaded via zbNative.dll on Windows... |
 | `log.zb.on` | ZombieBuddy: -agentlib:zbNative applied. |
-| `log.zb.off` | ZombieBuddy: disabled (profile). |
-| `log.zb.broken` | ZombieBuddy enabled but files incomplete (dll={0} jar={1})... |
+| `log.zb.broken` | ZombieBuddy files incomplete (dll={0} jar={1})... |
+| `log.zb.update` | ZombieBuddy update available (SHA-256 differs from the Workshop source)... |
 | `log.zb.external` | ZombieBuddy is also active outside this launcher ({0} patched). |
 | `log.zb.installed` | ZombieBuddy installed from: |
 | `log.zb.installfail` | ZombieBuddy install failed: |
 | `log.zb.nosource` | ZombieBuddy install source not found... |
+| `log.zb.modlist` | Removed ZombieBuddy from mod list(s): {0} |
 | `log.zb.uninstalled` | ZombieBuddy files removed. |
 | `log.zb.uninstallfail` | ZombieBuddy uninstall failed: |
-| `log.zb.toggled.on` | ZombieBuddy enabled. |
-| `log.zb.toggled.off` | ZombieBuddy disabled for this launcher. |
 | `right.vk` | VK (Zink) |
 | `right.vk.note` | Only when installed manually. Not recommended on Mac. |
 | `right.magstart` | Start Magpie |

@@ -77,7 +77,12 @@ internal static class ZombieBuddy
         {
             foreach (var apps in SteamFinder.GetLibrarySteamappsDirs())
             {
-                var libs = Path.Combine(apps, "workshop", "content", SteamFinder.PZAppId, WorkshopId, "libs");
+                var wsRoot = Path.Combine(apps, "workshop", "content", SteamFinder.PZAppId, WorkshopId);
+                // 実際の Workshop 構造は mods\ZombieBuddy\libs 配下。
+                var libs = Path.Combine(wsRoot, "mods", "ZombieBuddy", "libs");
+                if (File.Exists(Path.Combine(libs, DllName))) return libs;
+                // 旧想定 (Workshop ルート直下の libs) も後方互換で試す。
+                libs = Path.Combine(wsRoot, "libs");
                 if (File.Exists(Path.Combine(libs, DllName))) return libs;
             }
         }

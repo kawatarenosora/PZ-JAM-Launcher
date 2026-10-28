@@ -6,7 +6,7 @@ using System.Text;
 namespace PZLauncher;
 
 /// <summary>
-/// ★ZombieBuddy (Steam Workshop 3619862853) の検出 / 導入 / 除去。
+/// ★ZombieBuddy (Steam Workshop 3619862853 / ベータ 3812624292) の検出 / 導入 / 除去。
 ///
 /// <para>ランチャーは jre64\bin\java.exe を直接起動するため、公式 installer が
 ///   パッチする ProjectZomboid64.json / Steam 起動オプション / ProjectZomboid64.bat
@@ -23,8 +23,24 @@ namespace PZLauncher;
 internal static class ZombieBuddy
 {
     public const string WorkshopId = "3619862853";
+    /// <summary>★ベータ版 Workshop (検証用。リリース版と同時購読があり得る)。</summary>
+    public const string WorkshopIdBeta = "3812624292";
     public const string DllName = "zbNative.dll";
     public const string JarName = "ZombieBuddy.jar";
+
+    /// <summary>★導入ソースの種別。設定 (AppConfig.ZbSource) にも同じ値を記録する。</summary>
+    public const string KindRelease = "release";
+    public const string KindBeta = "beta";
+    public const string KindManual = "manual";
+
+    /// <summary>★導入ソース候補 1 件分。</summary>
+    public sealed class Source
+    {
+        /// <summary>"release" | "beta" | "manual"。</summary>
+        public string Kind;
+        /// <summary>zbNative.dll / ZombieBuddy.jar を含む libs ディレクトリ。</summary>
+        public string Libs;
+    }
 
     public sealed class State
     {
@@ -40,10 +56,14 @@ internal static class ZombieBuddy
         /// <summary>ProjectZomboid64.bat の _JAVA_OPTIONS 行に -agentlib:zbNative が
         ///   書き込まれている (Alternate Launch でも ZB が有効)。</summary>
         public bool BatPatched;
-        /// <summary>導入ソース (Workshop content または mods 配下の libs)。空は未発見。</summary>
+        /// <summary>導入ソース候補の最初の libs。空は未発見 (表示用の互換フィールド)。</summary>
         public string SourceLibs = string.Empty;
-        /// <summary>game dir の jar と導入ソースの jar の SHA-256 が不一致
-        ///   (Workshop 更新未反映または game dir 側が改変/破損)。</summary>
+        /// <summary>★SHA 比較に使ったソース種別。記録が空だった場合は一致した
+        ///   ソースから推定した値入りで返る (呼び出し側で保存する)。</summary>
+        public string ResolvedKind = string.Empty;
+        /// <summary>game dir の jar と「記録された導入ソース」の jar の SHA-256 が
+        ///   不一致 (Workshop 更新未反映または game dir 側が改変/破損)。
+        ///   記録ソースが見つからない (購読解除等) 場合は警告しない。</summary>
         public bool UpdateAvailable;
 
         /// <summary>dll + jar が揃っている (起動可能)。</summary>
@@ -52,7 +72,7 @@ internal static class ZombieBuddy
         public bool Present => Dll || Jar;
     }
 
-    public static State Detect(string gameDir)
+    public static State Detect(string gameDir, string recordedKind)
     {
         var st = new State();
         try
@@ -66,14 +86,37 @@ internal static class ZombieBuddy
             var bat = Path.Combine(gameDir, "ProjectZomboid64.bat");
             if (File.Exists(bat))
                 st.BatPatched = File.ReadAllText(bat).IndexOf("-agentlib:zbNative", StringComparison.OrdinalIgnoreCase) >= 0;
-            st.SourceLibs = FindSourceLibsDir();
-            // ★SHA チェック。両方ある時だけ比較する。.jar.new がある場合は
-            //   zbNative が次回起動時に置換するので警告を出さない。
-            if (st.Dll && st.Jar && !st.JarNew && !string.IsNullOrEmpty(st.SourceLibs))
+            var sources = FindSources();
+            st.SourceLibs = sources.Count > 0 ? sources[0].Libs : string.Empty;
+            // ★SHA チェックは「記録された導入ソース」の jar だけを対象にする。
+            //   リリース/ベータ両方を購読していると jar の内容が違うので、
+            //   非対象ソースと比較すると恒常的な偽不一致になる。記録ソースが
+            //   見つからない (購読解除等) 場合は警告しない。
+            //   .jar.new がある場合は zbNative が次回起動時に置換するので警告しない。
+            if (st.Dll && st.Jar && !st.JarNew)
             {
-                var srcJar = Path.Combine(st.SourceLibs, JarName);
-                if (File.Exists(srcJar))
-                    st.UpdateAvailable = Javamod.Sha256(Path.Combine(gameDir, JarName)) != Javamod.Sha256(srcJar);
+                Source src = null;
+                if (!string.IsNullOrEmpty(recordedKind))
+                    src = sources.Find(s => s.Kind == recordedKind);
+                if (src == null)
+                {
+                    // ★記録なし (旧設定からの移行) → game dir の jar と一致する
+                    //   ソースを採用する。一致がなければ先頭を警告対象にする。
+                    var gameSha = Javamod.Sha256(Path.Combine(gameDir, JarName));
+                    foreach (var s in sources)
+                    {
+                        var sj = Path.Combine(s.Libs, JarName);
+                        if (File.Exists(sj) && Javamod.Sha256(sj) == gameSha) { src = s; break; }
+                    }
+                    src ??= sources.Count > 0 ? sources[0] : null;
+                }
+                if (src != null)
+                {
+                    st.ResolvedKind = src.Kind;
+                    var srcJar = Path.Combine(src.Libs, JarName);
+                    if (File.Exists(srcJar))
+                        st.UpdateAvailable = Javamod.Sha256(Path.Combine(gameDir, JarName)) != Javamod.Sha256(srcJar);
+                }
             }
         }
         catch { }
@@ -81,22 +124,36 @@ internal static class ZombieBuddy
     }
 
     /// <summary>
-    /// ★導入ソース (zbNative.dll を含む libs ディレクトリ) を探す。
-    ///   1) Steam Workshop content、2) 手動インストール (%USERPROFILE%\Zomboid\mods\ZombieBuddy)。
+    /// ★導入ソース候補 (zbNative.dll を含む libs ディレクトリ) を全て探す。
+    ///   種別は 1) リリース版 Workshop <see cref="WorkshopId"/>、
+    ///   2) ベータ版 Workshop <see cref="WorkshopIdBeta"/>、
+    ///   3) 手動インストール (%USERPROFILE%\Zomboid\mods\ZombieBuddy)。
+    ///   同一種別は最初に見つかった Steam ライブラリのものだけを返す。
+    ///   実際の Workshop 構造は mods\ZombieBuddy\libs 配下 (ルート直下 libs も
+    ///   後方互換で試す)。
     /// </summary>
-    public static string FindSourceLibsDir()
+    public static List<Source> FindSources()
     {
+        var list = new List<Source>();
+        var seen = new HashSet<string>();
+        void Add(string kind, string libs)
+        {
+            if (seen.Contains(kind)) return;
+            if (File.Exists(Path.Combine(libs, DllName)))
+            {
+                list.Add(new Source { Kind = kind, Libs = libs });
+                seen.Add(kind);
+            }
+        }
         try
         {
             foreach (var apps in SteamFinder.GetLibrarySteamappsDirs())
             {
-                var wsRoot = Path.Combine(apps, "workshop", "content", SteamFinder.PZAppId, WorkshopId);
-                // 実際の Workshop 構造は mods\ZombieBuddy\libs 配下。
-                var libs = Path.Combine(wsRoot, "mods", "ZombieBuddy", "libs");
-                if (File.Exists(Path.Combine(libs, DllName))) return libs;
-                // 旧想定 (Workshop ルート直下の libs) も後方互換で試す。
-                libs = Path.Combine(wsRoot, "libs");
-                if (File.Exists(Path.Combine(libs, DllName))) return libs;
+                var ws = Path.Combine(apps, "workshop", "content", SteamFinder.PZAppId);
+                Add(KindRelease, Path.Combine(ws, WorkshopId, "mods", "ZombieBuddy", "libs"));
+                Add(KindRelease, Path.Combine(ws, WorkshopId, "libs"));
+                Add(KindBeta, Path.Combine(ws, WorkshopIdBeta, "mods", "ZombieBuddy", "libs"));
+                Add(KindBeta, Path.Combine(ws, WorkshopIdBeta, "libs"));
             }
         }
         catch { }
@@ -105,10 +162,10 @@ internal static class ZombieBuddy
             var mods = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 "Zomboid", "mods", "ZombieBuddy", "libs");
-            if (File.Exists(Path.Combine(mods, DllName))) return mods;
+            Add(KindManual, mods);
         }
         catch { }
-        return string.Empty;
+        return list;
     }
 
     /// <summary>

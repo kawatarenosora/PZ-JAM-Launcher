@@ -21,6 +21,10 @@
 | `render.d3d12` | D3D12 |
 | `right.zb` | ZombieBuddy: |
 | `zb.notinstalled` | not installed |
+| `zb.source.msg` | Multiple ZombieBuddy sources found. Which one do you want to install? |
+| `zb.source.release` | Release (Workshop 3619862853) |
+| `zb.source.beta` | Beta (Workshop 3812624292) |
+| `zb.source.manual` | Manual (Zomboid\mods\ZombieBuddy) |
 | `zb.broken` | incomplete |
 | `zb.install` | Install |
 | `zb.installed` | installed |
@@ -84,6 +88,7 @@
 | `dlg.jvmcustom` | Custom JVM |
 | `dlg.save` | Save |
 | `log.manual.saved` | Custom JVM settings saved. |
+| `dlg.cancel` | Cancel |
 | `dlg.default` | Defaults |
 | `log.update.checking` | Checking for updates... |
 | `log.update.fail` | Failed to get latest build. |

@@ -698,16 +698,30 @@ internal sealed class MainForm : Form
         catch { _lblAgents.Text = "-"; }
     }
 
+    /// <summary>★ZombieBuddy 検出 (記録ソース付き) + 記録の自己修復。
+    ///   旧設定で記録が空の場合、Detect が jar の SHA 一致からソースを
+    ///   推定して ResolvedKind に入れて返すので、ここで保存しておく。</summary>
+    private ZombieBuddy.State ZbDetect(string gd)
+    {
+        var st = ZombieBuddy.Detect(gd, _config.ZbSource);
+        if (string.IsNullOrEmpty(_config.ZbSource) && !string.IsNullOrEmpty(st.ResolvedKind))
+        {
+            _config.ZbSource = st.ResolvedKind;
+            _config.Save();
+        }
+        return st;
+    }
+
     /// <summary>★ZombieBuddy 行の表示とボタン出し分け。
     ///   導入/除去がそのまま有効/無効を兼ねるためトグルは置かない。
-    ///   導入済みでソースの jar と SHA が不一致なら「更新あり」(橙) を出す。</summary>
+    ///   導入済みで記録ソースの jar と SHA が不一致なら「更新あり」(橙) を出す。</summary>
     private void RefreshZbRow()
     {
         if (_lblZb == null || _btnZbInstall == null) return;
         try
         {
             var gd = _txtGamePath.Text.Trim();
-            var st = ZombieBuddy.Detect(gd);
+            var st = ZbDetect(gd);
             bool running = false;
             try { running = IsGameRunning(); } catch { }
             _btnZbInstall.Visible = false;
@@ -760,18 +774,87 @@ internal sealed class MainForm : Form
     {
         var gd = _txtGamePath.Text.Trim();
         if (string.IsNullOrEmpty(gd) || !Directory.Exists(gd)) { Log(L.T("log.nogame", "Game not found. Specify manually.")); return; }
-        var src = ZombieBuddy.FindSourceLibsDir();
-        if (string.IsNullOrEmpty(src)) { Log(L.T("log.zb.nosource", "ZombieBuddy install source not found (subscribe to the Workshop mod, or extract it to Zomboid\\mods\\ZombieBuddy).")); return; }
-        var err = ZombieBuddy.Install(gd, src);
+        var sources = ZombieBuddy.FindSources();
+        if (sources.Count == 0) { Log(L.T("log.zb.nosource", "ZombieBuddy install source not found (subscribe to the Workshop mod, or extract it to Zomboid\\mods\\ZombieBuddy).")); return; }
+        var src = sources[0];
+        if (sources.Count > 1)
+        {
+            // ★リリース/ベータ/手動が複数ある → 選ばせ、選択を記録する。
+            var kind = ChooseZbSource(sources);
+            if (kind == null) return;
+            src = sources.Find(s => s.Kind == kind);
+        }
+        var err = ZombieBuddy.Install(gd, src.Libs);
         if (!string.IsNullOrEmpty(err)) { Log(L.T("log.zb.installfail", "ZombieBuddy install failed: ") + err); return; }
-        Log(L.T("log.zb.installed", "ZombieBuddy installed from: ") + src);
+        // ★導入ソースを記録。起動時の SHA 更新チェックはこのソースだけが対象。
+        _config.ZbSource = src.Kind;
+        _config.Save();
+        Log(L.T("log.zb.installed", "ZombieBuddy installed from: ") + src.Libs);
         RefreshZbRow();
+    }
+
+    /// <summary>★導入ソース選択ダイアログ (候補が複数の時のみ出す)。
+    ///   戻り値は選択された種別、キャンセルは null。</summary>
+    private string ChooseZbSource(List<ZombieBuddy.Source> sources)
+    {
+        string SourceLabel(ZombieBuddy.Source s) => s.Kind switch
+        {
+            ZombieBuddy.KindRelease => L.T("zb.source.release", "Release (Workshop 3619862853)"),
+            ZombieBuddy.KindBeta => L.T("zb.source.beta", "Beta (Workshop 3812624292)"),
+            _ => L.T("zb.source.manual", "Manual (Zomboid\\mods\\ZombieBuddy)"),
+        };
+        using var dlg = new Form
+        {
+            Text = "ZombieBuddy",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(440, 40 + sources.Count * 28 + 42),
+        };
+        var top = 12;
+        var lbl = new Label
+        {
+            Text = L.T("zb.source.msg", "Multiple ZombieBuddy sources found. Which one do you want to install?"),
+            Location = new Point(12, top),
+            AutoSize = true,
+            MaximumSize = new Size(416, 0),
+        };
+        dlg.Controls.Add(lbl);
+        top += lbl.PreferredHeight + 8;
+        var radios = new List<RadioButton>();
+        foreach (var s in sources)
+        {
+            var rb = new RadioButton
+            {
+                Text = SourceLabel(s),
+                Location = new Point(16, top),
+                AutoSize = true,
+                Checked = radios.Count == 0,
+            };
+            radios.Add(rb);
+            dlg.Controls.Add(rb);
+            top += rb.GetPreferredSize(Size.Empty).Height + 4;
+        }
+        top += 4;
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(440 - 190, top), Size = new Size(84, 28) };
+        var cancel = new Button { Text = L.T("dlg.cancel", "Cancel"), DialogResult = DialogResult.Cancel, Location = new Point(440 - 96, top), Size = new Size(84, 28) };
+        dlg.Controls.Add(ok);
+        dlg.Controls.Add(cancel);
+        dlg.AcceptButton = ok;
+        dlg.CancelButton = cancel;
+        if (dlg.ShowDialog(this) != DialogResult.OK) return null;
+        foreach (var rb in radios)
+            if (rb.Checked)
+                return sources[radios.IndexOf(rb)].Kind;
+        return null;
     }
 
     private void ZbUninstall()
     {
         var gd = _txtGamePath.Text.Trim();
-        var st = ZombieBuddy.Detect(gd);
+        var st = ZbDetect(gd);
         // ★json / bat にパッチが残っていると、ランチャー外の起動で
         //   zbNative.dll 探しに失敗して JVM が即死する。先に警告する。
         var ext = new List<string>();
@@ -1049,7 +1132,7 @@ internal sealed class MainForm : Form
             //   小型ランチャー / Steam 起動オプション経由の話で、java.exe 直起動の
             //   ここでは渡すと Unrecognized option で落ちる。実測済み)。
             psi.Environment["_JAVA_OPTIONS"] = string.Empty;
-            var zbState = ZombieBuddy.Detect(gameDir);
+            var zbState = ZbDetect(gameDir);
 
             string mainClass = "zombie.gameStates.MainScreenState";
             string classpath = "./;projectzomboid.jar";

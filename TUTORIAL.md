@@ -113,10 +113,13 @@ Mismatch/warn/excluded reasons appear per row in the launch log. In **Safe mode*
 ## 6. ZombieBuddy row
 
 The launcher detects [ZombieBuddy](https://github.com/zed-0xff/ZombieBuddy), the
-Java-mod framework (Workshop mod `3619862853`). When it is not installed but its
-Workshop content (or a manual `Zomboid\mods\ZombieBuddy` copy) is present, an
-**Install** button copies `zbNative.dll` and `ZombieBuddy.jar` into the game
-folder for you — no need to run the official installer for launcher-only use.
+Java-mod framework. Install sources are the release Workshop item
+(`3619862853`), the beta Workshop item (`3812624292`) and a manual
+`Zomboid\mods\ZombieBuddy` copy. When more than one is present, **Install**
+asks which one to use and remembers the choice; the update check (SHA-256 of
+the game-folder jar against that source) only compares against the recorded
+source, so having both Workshop items subscribed never causes false
+"update available" warnings. To switch sources, uninstall and install again.
 
 Installing / uninstalling **is** enabling / disabling: launches attach
 `-agentlib:zbNative` whenever the files are present. There is no separate

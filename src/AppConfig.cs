@@ -15,6 +15,14 @@ internal sealed class AppConfig
     ///   空は旧 Vk bool 扱いで、Load 時に補完する。
     /// </summary>
     public string Render { get; set; } = string.Empty;
+    /// <summary>
+    /// ★ZombieBuddy の導入ソース種別。"release" (Workshop 3619862853) /
+    ///   "beta" (Workshop 3812624292) / "manual" (Zomboid\mods 配下)。
+    ///   導入時に選択したものを記録し、起動時の SHA 更新チェックはこの
+    ///   ソースの jar だけを対象にする (リリース/ベータ併購読時の偽不一致防止)。
+    ///   空は旧設定 (初回 Detect 時に jar 一致から推定して保存する)。
+    /// </summary>
+    public string ZbSource { get; set; } = string.Empty;
     public string Extra { get; set; } = string.Empty;
     public string ManualText { get; set; } = string.Empty;
     public bool SafeMode { get; set; }
